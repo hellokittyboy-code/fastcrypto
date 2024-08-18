@@ -131,7 +131,7 @@ impl OIDCProvider {
         match self {
             OIDCProvider::Google => ProviderConfig::new(
                 "https://accounts.google.com",
-                "https://www.googleapis.com/oauth2/v2/certs",
+                "https://www.googleapis.com/oauth2/v3/certs",
             ),
             OIDCProvider::Twitch => ProviderConfig::new(
                 "https://id.twitch.tv/oauth2",
@@ -192,13 +192,18 @@ pub struct JWK {
 /// Reader struct to parse all fields in a JWK from JSON.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JWKReader {
-    e: String,
-    n: String,
+    /// RSA public exponent, https://datatracker.ietf.org/doc/html/rfc7517#section-9.3
+    pub e: String,
+    /// RSA modulus, https://datatracker.ietf.org/doc/html/rfc7517#section-9.3
+    pub n: String,
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
     my_use: Option<String>,
-    kid: String,
-    kty: String,
-    alg: String,
+    /// https://datatracker.ietf.org/doc/html/rfc7517#section-4.5
+    pub kid: String,
+    /// Key type parameter, https://datatracker.ietf.org/doc/html/rfc7517#section-4.1
+    pub kty: String,
+    /// Algorithm parameter, https://datatracker.ietf.org/doc/html/rfc7517#section-4.4
+    pub alg: String,
 }
 
 impl JWK {
