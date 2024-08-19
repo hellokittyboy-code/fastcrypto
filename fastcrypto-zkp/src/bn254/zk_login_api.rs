@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::str::FromStr;
-
+use std::string::ToString;
 use ark_snark::SNARK;
 use fastcrypto::rsa::{Base64UrlUnpadded, Encoding};
 
-use super::zk_login::{JwkId, ZkLoginInputs, JWK};
+use super::zk_login::{JwkId, ZkLoginInputs, JWK, fetch_jwk_from_salt_service};
 use crate::bn254::utils::{gen_address_seed_with_salt_hash, get_zk_login_address};
 use crate::zk_login_utils::{
     g1_affine_from_str_projective, g2_affine_from_str_projective, Bn254FqElement, Bn254FrElement,
@@ -40,6 +40,13 @@ static GLOBAL_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(globa
 
 /// Corresponding to proofs generated from prover-dev. Used in devnet/testnet.
 static INSECURE_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(insecure_pvk);
+
+/// test env salt service url
+static TEST_SALT_URL: &str = "https://devsalt.openblock.vip/get_jwk";
+
+/// prod env salt service url
+static PROD_SALT_URL: &str = "https://salt.benfen.org/get_jwk";
+
 
 /// Load a fixed verifying key from zkLogin.vkey output. This is based on a local setup and should not use in production.
 fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
@@ -329,11 +336,24 @@ pub fn verify_zk_login(
 ) -> Result<(), FastCryptoError> {
     // Load the expected JWK based on (iss, kid).
     let (iss, kid) = (input.get_iss().to_string(), input.get_kid().to_string());
-    let jwk = all_jwk
-        .get(&JwkId::new(iss.clone(), kid.clone()))
-        .ok_or_else(|| {
-            FastCryptoError::GeneralError(format!("JWK not found ({} - {})", iss, kid))
-        })?;
+    let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
+        Some(jwk) => Ok(jwk),
+        None => {
+            if max_epoch >= 30000 {
+                let url = match env {
+                    ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
+                    _ => PROD_SALT_URL.to_string(),
+                };
+                let jwk_tuple = fetch_jwk_from_salt_service(url, &iss, &kid)?;
+                Ok(jwk_tuple)
+            } else {
+                Err(FastCryptoError::GeneralError(format!(
+                    "JWK not found ({} - {})",
+                    iss, kid
+                )))
+            }
+        }
+    }?;
 
     // Decode modulus to bytes.
     let modulus = Base64UrlUnpadded::decode_vec(&jwk.n).map_err(|_| {

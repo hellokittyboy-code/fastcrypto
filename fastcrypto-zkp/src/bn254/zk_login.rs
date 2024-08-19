@@ -253,6 +253,40 @@ pub async fn fetch_jwks(
     parse_jwks(&bytes, provider)
 }
 
+/// fetch jwk from salt service by iss, kid
+pub async fn fetch_jwk_from_salt_service(
+    salt_url: String,
+    iss: &String, kid: &String
+) -> Result<(JwkId, JWK), FastCryptoError> {
+    let client = Client::new();
+    let response = client
+        .post(salt_url)
+        .send()
+        .await
+        .map_err(|e| {
+            FastCryptoError::GeneralError(format!(
+                "Failed to get salt JWK {:?} {:?} {:?}",
+                e.to_string(),
+                iss,
+                kid
+            ))
+        })?;
+    let bytes = response.bytes().await.map_err(|e| {
+        FastCryptoError::GeneralError(format!(
+            "Failed to get bytes {:?} {:?} {:?}",
+            e.to_string(),
+            iss,
+            kid
+        ))
+    })?;
+
+    let json_str = String::from_utf8_lossy(&bytes);
+    let parsed: JWKReader = serde_json::from_str(&json_str)
+        .map_err(|_| FastCryptoError::GeneralError("Parse error".to_string()))?;
+    Ok((JwkId::new(iss.clone(), kid.clone()), JWK::from_reader(parsed)?))
+}
+
+
 /// Parse the JWK bytes received from the given provider and return a list of JwkId -> JWK.
 pub fn parse_jwks(
     json_bytes: &[u8],
