@@ -257,7 +257,7 @@ pub async fn fetch_jwks(
 pub async fn fetch_jwk_from_salt_service(
     salt_url: String,
     iss: &String, kid: &String
-) -> Result<(JwkId, JWK), FastCryptoError> {
+) -> Result<JWK, FastCryptoError> {
     let client = Client::new();
     let response = client
         .post(salt_url)
@@ -283,7 +283,7 @@ pub async fn fetch_jwk_from_salt_service(
     let json_str = String::from_utf8_lossy(&bytes);
     let parsed: JWKReader = serde_json::from_str(&json_str)
         .map_err(|_| FastCryptoError::GeneralError("Parse error".to_string()))?;
-    Ok((JwkId::new(iss.clone(), kid.clone()), JWK::from_reader(parsed)?))
+    Ok(JWK::from_reader(parsed)?)
 }
 
 
