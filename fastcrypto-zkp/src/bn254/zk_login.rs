@@ -439,6 +439,7 @@ impl ZkLoginInputs {
         let header_f = hash_ascii_str_to_field(&self.header_base64, MAX_HEADER_LEN)?;
         let modulus_f = hash_to_field(&[BigUint::from_bytes_be(modulus)], 2048, PACK_WIDTH)?;
         poseidon_zk_login(vec![
+            modulus_f,
             first,
             second,
             addr_seed,
@@ -446,7 +447,6 @@ impl ZkLoginInputs {
             iss_base64_f,
             index_mod_4_f,
             header_f,
-            modulus_f,
         ])
     }
 }
