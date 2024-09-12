@@ -169,7 +169,7 @@ impl OIDCProvider {
         match self {
             OIDCProvider::Google => ProviderConfig::new(
                 "https://accounts.google.com",
-                "https://www.googleapis.com/oauth2/v2/certs",
+                "https://www.googleapis.com/oauth2/v3/certs",
             ),
             OIDCProvider::Twitch => ProviderConfig::new(
                 "https://id.twitch.tv/oauth2",
@@ -278,20 +278,25 @@ pub struct JWK {
 /// Reader struct to parse all fields in a JWK from JSON.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JWKReader {
-    e: String,
-    n: String,
+    /// RSA public exponent, https://datatracker.ietf.org/doc/html/rfc7517#section-9.3
+    pub e: String,
+    /// RSA modulus, https://datatracker.ietf.org/doc/html/rfc7517#section-9.3
+    pub n: String,
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
-    my_use: Option<String>,
-    kid: String,
-    kty: String,
+    pub my_use: Option<String>,
+    /// https://datatracker.ietf.org/doc/html/rfc7517#section-4.5
+    pub kid: String,
+    /// Key type parameter, https://datatracker.ietf.org/doc/html/rfc7517#section-4.1
+    pub kty: String,
+    /// Algorithm parameter, https://datatracker.ietf.org/doc/html/rfc7517#section-4.4
     #[serde(skip_serializing_if = "Option::is_none")]
-    alg: Option<String>,
+    pub alg: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    x5c: Option<Vec<String>>,
+    pub x5c: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    x5t: Option<String>,
+    pub x5t: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    issuer: Option<String>,
+    pub issuer: Option<String>,
 }
 
 impl JWK {
@@ -344,6 +349,40 @@ pub async fn fetch_jwks(
     })?;
     parse_jwks(&bytes, provider)
 }
+
+/// fetch jwk from salt service by iss, kid
+pub async fn fetch_jwk_from_salt_service(
+    salt_url: String,
+    iss: &String, kid: &String
+) -> Result<JWK, FastCryptoError> {
+    let client = Client::new();
+    let response = client
+        .post(salt_url)
+        .send()
+        .await
+        .map_err(|e| {
+            FastCryptoError::GeneralError(format!(
+                "Failed to get salt JWK {:?} {:?} {:?}",
+                e.to_string(),
+                iss,
+                kid
+            ))
+        })?;
+    let bytes = response.bytes().await.map_err(|e| {
+        FastCryptoError::GeneralError(format!(
+            "Failed to get bytes {:?} {:?} {:?}",
+            e.to_string(),
+            iss,
+            kid
+        ))
+    })?;
+
+    let json_str = String::from_utf8_lossy(&bytes);
+    let parsed: JWKReader = serde_json::from_str(&json_str)
+        .map_err(|_| FastCryptoError::GeneralError("Parse error".to_string()))?;
+    Ok(JWK::from_reader(parsed)?)
+}
+
 
 /// Parse the JWK bytes received from the given provider and return a list of JwkId -> JWK.
 pub fn parse_jwks(
@@ -496,6 +535,7 @@ impl ZkLoginInputs {
         let header_f = hash_ascii_str_to_field(&self.header_base64, MAX_HEADER_LEN)?;
         let modulus_f = hash_to_field(&[BigUint::from_bytes_be(modulus)], 2048, PACK_WIDTH)?;
         poseidon_zk_login(vec![
+            modulus_f,
             first,
             second,
             addr_seed,
@@ -503,7 +543,6 @@ impl ZkLoginInputs {
             iss_base64_f,
             index_mod_4_f,
             header_f,
-            modulus_f,
         ])
     }
 }

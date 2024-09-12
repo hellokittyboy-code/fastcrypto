@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::str::FromStr;
-
+use std::string::ToString;
 use ark_snark::SNARK;
 use fastcrypto::rsa::{Base64UrlUnpadded, Encoding};
 
-use super::zk_login::{JwkId, ZkLoginInputs, JWK};
+use super::zk_login::{JwkId, ZkLoginInputs, JWK, fetch_jwk_from_salt_service};
 use crate::bn254::utils::{gen_address_seed_with_salt_hash, get_zk_login_address};
 use crate::zk_login_utils::{
     g1_affine_from_str_projective, g2_affine_from_str_projective, Bn254FqElement, Bn254FrElement,
@@ -19,6 +19,7 @@ use fastcrypto::error::{FastCryptoError, FastCryptoResult};
 use im::hashmap::HashMap as ImHashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use tokio::runtime::{Handle, Runtime};
 
 /// Enum to specify the environment to use for verifying keys.
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq, Copy)]
@@ -41,16 +42,30 @@ static GLOBAL_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(globa
 /// Corresponding to proofs generated from prover-dev. Used in devnet/testnet.
 static INSECURE_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(insecure_pvk);
 
+/// test env salt service url
+static TEST_SALT_URL: &str = "https://devsalt.openblock.vip/get_jwk";
+
+/// prod env salt service url
+static PROD_SALT_URL: &str = "https://salt.benfen.org/get_jwk";
+
+static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    Runtime::new().expect("Failed to create Tokio runtime")
+});
+
+fn get_or_create_handle() -> Handle {
+    RUNTIME.handle().clone()
+}
+
 /// Load a fixed verifying key from zkLogin.vkey output. This is based on a local setup and should not use in production.
 fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
     let vk_alpha_1 = g1_affine_from_str_projective(&vec![
         Bn254FqElement::from_str(
-            "20491192805390485299153009773594534940189261866228447918068658471970481763042",
+            "10486870317575482004325641846182837176708253300684465201586876520614192607153",
         )
         .unwrap(),
         Bn254FqElement::from_str(
-            "9383485363053290200918347156157836566562967994039712273449902621266178545958",
+            "18289876836557182205892674936521124677204296577744626651090694285514486605677",
         )
         .unwrap(),
         Bn254FqElement::from_str("1").unwrap(),
@@ -59,21 +74,21 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_beta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "6375614351688725206403948262868962793625744043794305715222011528459656738731",
+                "16423420719949315005607493052759952659822396864534263074696116094427677957135",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "4252822878758300859123897981450591353533073413197771768651442665752259397132",
+                "10153784102660194152306160659369981418446853176359559679459141422566922426426",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "10505242626370262277552901082094356697409835680220590971873171140371331206856",
+                "682803926984143818491220402447680781735575385966789415023092266064541528013",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "21847035105528745403288232691147584728191162732299865338377159692350059136679",
+                "14640144170568215402490069515698775130228899726999124519542844564350045122118",
             )
             .unwrap(),
         ],
@@ -113,21 +128,21 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_delta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "10857046999023057135944570762232829481370756359578518086990519993285655852781",
+                "12687679818339159675086771448405940961075003727323348789874655030680763368170",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "11559732032986387107991004021392285783925812861821192530917403151452391805634",
+                "20131337926880560313667174815449895182479278532374522581632605015210298759416",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "8495653923123431417604973247489272438418190587263600148770280649306958101930",
+                "12892366007662385056376241953320811680834838226802486151950494618481391531780",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "4082367875863433681332203403145435568316851327593401208105741076214120093531",
+                "7126814857099440491334268796407513969004982548595823801391053189371004225922",
             )
             .unwrap(),
         ],
@@ -143,22 +158,22 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     for e in [
         vec![
             Bn254FqElement::from_str(
-                "20701306374481714853949730154526815782802808896228594855451770849676897643964",
+                "2384908825501153019491429962094557306009374441195645039727289507624083600751",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "2766989084754673216772682210231588284954002353414778477810174100808747060165",
+                "2613769222406147230713374930082536137144980556862450295328405252555827402431",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "501195541410525737371980194958674422793469475773065719916327137354779402600",
+                "17226256573947603430188556193894727250628005019295526579627452122403472548067",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "13527631693157515024233848630878973193664410306029731429350155106228769355415",
+                "989834569855054895117325689851309607601751358988265054513811191456714431615",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
@@ -329,11 +344,25 @@ pub fn verify_zk_login(
 ) -> Result<(), FastCryptoError> {
     // Load the expected JWK based on (iss, kid).
     let (iss, kid) = (input.get_iss().to_string(), input.get_kid().to_string());
-    let jwk = all_jwk
-        .get(&JwkId::new(iss.clone(), kid.clone()))
-        .ok_or_else(|| {
-            FastCryptoError::GeneralError(format!("JWK not found ({} - {})", iss, kid))
-        })?;
+    let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
+        Some(jwk) => Ok(jwk.clone()),
+        None => {
+            if max_epoch >= 30000 {
+                let url = match env {
+                    ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
+                    _ => PROD_SALT_URL.to_string(),
+                };
+                let handle = Handle::try_current().unwrap_or_else(|_| get_or_create_handle());
+                let jwk = handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))?;
+                Ok(jwk)
+            } else {
+                Err(FastCryptoError::GeneralError(format!(
+                    "JWK not found ({} - {})",
+                    iss, kid
+                )))
+            }
+        }
+    }?;
 
     // Decode modulus to bytes.
     let modulus = Base64UrlUnpadded::decode_vec(&jwk.n).map_err(|_| {
