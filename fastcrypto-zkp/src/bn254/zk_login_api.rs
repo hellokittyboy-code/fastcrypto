@@ -20,6 +20,7 @@ use im::hashmap::HashMap as ImHashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::{Handle};
+use tokio::task;
 use tracing::info;
 
 /// Enum to specify the environment to use for verifying keys.
@@ -346,8 +347,10 @@ pub fn verify_zk_login(
                     ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
                     _ => PROD_SALT_URL.to_string(),
                 };
-                let handle = Handle::try_current().map_err(|e| FastCryptoError::GeneralError(e.to_string()))?;
-                let jwk = handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))?;
+                let jwk = task::block_in_place(|| {
+                    let handle = Handle::try_current().map_err(|e| FastCryptoError::GeneralError(e.to_string()))?;;
+                    handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))
+                })?;
                 Ok(jwk)
             } else {
                 Err(FastCryptoError::GeneralError(format!(
