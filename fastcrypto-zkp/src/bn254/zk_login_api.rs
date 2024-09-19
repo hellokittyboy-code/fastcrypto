@@ -21,7 +21,6 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::{Handle};
 use tokio::task;
-use tracing::info;
 
 /// Enum to specify the environment to use for verifying keys.
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq, Copy)]
@@ -337,7 +336,6 @@ pub fn verify_zk_login(
     env: &ZkLoginEnv,
 ) -> Result<(), FastCryptoError> {
     // Load the expected JWK based on (iss, kid).
-    info!("verify_zk_login, kid={}, max_epoch={}", input.get_kid(), max_epoch);
     let (iss, kid) = (input.get_iss().to_string(), input.get_kid().to_string());
     let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
         Some(jwk) => Ok(jwk.clone()),
