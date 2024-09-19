@@ -19,7 +19,8 @@ use fastcrypto::error::{FastCryptoError, FastCryptoResult};
 use im::hashmap::HashMap as ImHashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::{Handle};
+use tracing::info;
 
 /// Enum to specify the environment to use for verifying keys.
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq, Copy)]
@@ -47,14 +48,6 @@ static TEST_SALT_URL: &str = "https://devsalt.openblock.vip/get_jwk";
 
 /// prod env salt service url
 static PROD_SALT_URL: &str = "https://salt.benfen.org/get_jwk";
-
-static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    Runtime::new().expect("Failed to create Tokio runtime")
-});
-
-fn get_or_create_handle() -> Handle {
-    RUNTIME.handle().clone()
-}
 
 /// Load a fixed verifying key from zkLogin.vkey output. This is based on a local setup and should not use in production.
 fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
@@ -343,6 +336,7 @@ pub fn verify_zk_login(
     env: &ZkLoginEnv,
 ) -> Result<(), FastCryptoError> {
     // Load the expected JWK based on (iss, kid).
+    info!("verify_zk_login, kid={}, max_epoch={}", input.get_kid(), max_epoch);
     let (iss, kid) = (input.get_iss().to_string(), input.get_kid().to_string());
     let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
         Some(jwk) => Ok(jwk.clone()),
@@ -352,7 +346,7 @@ pub fn verify_zk_login(
                     ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
                     _ => PROD_SALT_URL.to_string(),
                 };
-                let handle = Handle::try_current().unwrap_or_else(|_| get_or_create_handle());
+                let handle = Handle::try_current().map_err(|e| FastCryptoError::GeneralError(e.to_string()))?;
                 let jwk = handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))?;
                 Ok(jwk)
             } else {
