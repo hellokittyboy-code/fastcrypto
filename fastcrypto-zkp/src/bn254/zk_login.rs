@@ -3,7 +3,7 @@
 
 use fastcrypto::{error::FastCryptoResult, jwt_utils::JWTHeader};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use super::utils::split_to_two_frs;
 use crate::bn254::poseidon::poseidon_zk_login;
@@ -23,6 +23,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::str::FromStr;
+use reqwest::header::{HeaderMap, HeaderValue};
 
 #[cfg(test)]
 #[path = "unit_tests/zk_login_tests.rs"]
@@ -259,8 +260,14 @@ pub async fn fetch_jwk_from_salt_service(
     iss: &String, kid: &String
 ) -> Result<JWK, FastCryptoError> {
     let client = Client::new();
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+    let json_body = json!({"kid": kid, "iss": iss});
+
     let response = client
         .post(salt_url)
+        .headers(headers)
+        .body(json_body.to_string())
         .send()
         .await
         .map_err(|e| {
@@ -271,6 +278,8 @@ pub async fn fetch_jwk_from_salt_service(
                 kid
             ))
         })?;
+    // println!("response={:?}", &response);
+
     let bytes = response.bytes().await.map_err(|e| {
         FastCryptoError::GeneralError(format!(
             "Failed to get bytes {:?} {:?} {:?}",
@@ -281,6 +290,7 @@ pub async fn fetch_jwk_from_salt_service(
     })?;
 
     let json_str = String::from_utf8_lossy(&bytes);
+    // println!("json_str={}", &json_str);
     let parsed: JWKReader = serde_json::from_str(&json_str)
         .map_err(|_| FastCryptoError::GeneralError("Parse error".to_string()))?;
     Ok(JWK::from_reader(parsed)?)

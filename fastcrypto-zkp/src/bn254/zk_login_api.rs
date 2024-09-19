@@ -348,7 +348,7 @@ pub fn verify_zk_login(
                     _ => PROD_SALT_URL.to_string(),
                 };
                 let jwk = task::block_in_place(|| {
-                    let handle = Handle::try_current().map_err(|e| FastCryptoError::GeneralError(e.to_string()))?;;
+                    let handle = Handle::try_current().map_err(|e| FastCryptoError::GeneralError(e.to_string()))?;
                     handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))
                 })?;
                 Ok(jwk)
