@@ -341,22 +341,12 @@ pub fn verify_zk_login(
     let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
         Some(jwk) => Ok(jwk.clone()),
         None => {
-            if cfg!(msim) {
-                return Err(FastCryptoError::GeneralError(format!(
-                    "JWK not found ({} - {})",
-                    iss, kid
-                )));
-            }
-
             if max_epoch >= 30000 {
                 let url = match env {
                     ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
                     _ => PROD_SALT_URL.to_string(),
                 };
-                let jwk_task : JoinHandle<Result<JWK, FastCryptoError>> = task::spawn_blocking(move || {
-                    let handle = Handle::try_current().map_err(|_e| FastCryptoError::GeneralError("handle try current error".to_string()))?;
-                    handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))
-                });
+                let jwk_task : JoinHandle<Result<JWK, FastCryptoError>> = task::spawn_blocking(move || fetch_jwk_from_salt_service(url, &iss, &kid));
                 let handle = Handle::try_current().map_err(|_e| FastCryptoError::GeneralError("handle try current error".to_string()))?;
                 let jwk = handle.block_on(jwk_task).map_err(|_e| FastCryptoError::GeneralError("jwk task join error".to_string()))??;
                 Ok(jwk)
