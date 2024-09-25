@@ -19,9 +19,6 @@ use fastcrypto::error::{FastCryptoError, FastCryptoResult};
 use im::hashmap::HashMap as ImHashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::{Handle};
-use tokio::task;
-use tokio::task::JoinHandle;
 
 /// Enum to specify the environment to use for verifying keys.
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq, Copy)]
@@ -346,9 +343,7 @@ pub fn verify_zk_login(
                     ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
                     _ => PROD_SALT_URL.to_string(),
                 };
-                let jwk_task : JoinHandle<Result<JWK, FastCryptoError>> = task::spawn_blocking(move || fetch_jwk_from_salt_service(url, &iss, &kid));
-                let handle = Handle::try_current().map_err(|_e| FastCryptoError::GeneralError("handle try current error".to_string()))?;
-                let jwk = handle.block_on(jwk_task).map_err(|_e| FastCryptoError::GeneralError("jwk task join error".to_string()))??;
+                let jwk = fetch_jwk_from_salt_service(url, &iss, &kid)?;
                 Ok(jwk)
             } else {
                 Err(FastCryptoError::GeneralError(format!(
