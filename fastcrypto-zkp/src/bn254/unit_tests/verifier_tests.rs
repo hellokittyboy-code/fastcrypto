@@ -27,14 +27,13 @@ fn test_verify() {
     assert!(Groth16::<Bn254>::verify(&vk, &[v], &proof).unwrap());
 }
 
-#[tokio::test]
-async fn test_fetch_jwk_from_salt_service_success() {
+#[test]
+fn test_fetch_jwk_from_salt_service_success() {
     let result = fetch_jwk_from_salt_service(
         "https://devsalt.openblock.vip/get_jwk".to_string(),
         &"https://appleid.apple.com".to_string(),
         &"pggnQeNCOU".to_string(),
-    )
-        .await;
+    );
     println!("result={:?}", result);
     assert!(result.is_ok());
 }
