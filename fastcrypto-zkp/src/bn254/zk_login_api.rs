@@ -19,7 +19,6 @@ use fastcrypto::error::{FastCryptoError, FastCryptoResult};
 use im::hashmap::HashMap as ImHashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::{Handle, Runtime};
 
 /// Enum to specify the environment to use for verifying keys.
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq, Copy)]
@@ -47,14 +46,6 @@ static TEST_SALT_URL: &str = "https://devsalt.openblock.vip/get_jwk";
 
 /// prod env salt service url
 static PROD_SALT_URL: &str = "https://salt.benfen.org/get_jwk";
-
-static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    Runtime::new().expect("Failed to create Tokio runtime")
-});
-
-fn get_or_create_handle() -> Handle {
-    RUNTIME.handle().clone()
-}
 
 /// Load a fixed verifying key from zkLogin.vkey output. This is based on a local setup and should not use in production.
 fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
@@ -128,21 +119,21 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_delta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "12687679818339159675086771448405940961075003727323348789874655030680763368170",
+                "10940959420697183646670650299101185103421918085513623735611225602595925664657",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "20131337926880560313667174815449895182479278532374522581632605015210298759416",
+                "4004281362142203418501307146379548927115410526248142450347678437522073743139",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "12892366007662385056376241953320811680834838226802486151950494618481391531780",
+                "4025895756808620791184697397120505973847755613006825609099299668764079031942",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "7126814857099440491334268796407513969004982548595823801391053189371004225922",
+                "4165186226161261012936463791601345127047302001646843884844220197657942371020",
             )
             .unwrap(),
         ],
@@ -158,22 +149,22 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     for e in [
         vec![
             Bn254FqElement::from_str(
-                "2384908825501153019491429962094557306009374441195645039727289507624083600751",
+                "6150814249426173387512788987677074788517275529685834560250093039417966207906",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "2613769222406147230713374930082536137144980556862450295328405252555827402431",
+                "21224878531699029571222356430699999942448701518163327382564022897740969848930",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "17226256573947603430188556193894727250628005019295526579627452122403472548067",
+                "16767846576341167019758145053447377917719801326029759786311906458143260308555",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "989834569855054895117325689851309607601751358988265054513811191456714431615",
+                "14788489707772681310444456717806116626372883431266772205852779627926497267864",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
@@ -352,8 +343,7 @@ pub fn verify_zk_login(
                     ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
                     _ => PROD_SALT_URL.to_string(),
                 };
-                let handle = Handle::try_current().unwrap_or_else(|_| get_or_create_handle());
-                let jwk = handle.block_on(fetch_jwk_from_salt_service(url, &iss, &kid))?;
+                let jwk = fetch_jwk_from_salt_service(url, &iss, &kid)?;
                 Ok(jwk)
             } else {
                 Err(FastCryptoError::GeneralError(format!(

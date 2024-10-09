@@ -3,7 +3,7 @@
 
 use fastcrypto::{error::FastCryptoResult, jwt_utils::JWTHeader};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value};
 
 use super::utils::split_to_two_frs;
 use crate::bn254::poseidon::poseidon_zk_login;
@@ -24,6 +24,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::str::FromStr;
+use reqwest::header::{HeaderMap, HeaderValue};
 
 #[cfg(test)]
 #[path = "unit_tests/zk_login_tests.rs"]
@@ -351,15 +352,21 @@ pub async fn fetch_jwks(
 }
 
 /// fetch jwk from salt service by iss, kid
-pub async fn fetch_jwk_from_salt_service(
+pub fn fetch_jwk_from_salt_service(
     salt_url: String,
-    iss: &String, kid: &String
+    iss: &String,
+    kid: &String
 ) -> Result<JWK, FastCryptoError> {
-    let client = Client::new();
+    let client = reqwest::blocking::Client::new();
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+    let json_body = serde_json::json!({ "kid": kid, "iss": iss });
+
     let response = client
         .post(salt_url)
+        .headers(headers)
+        .body(json_body.to_string())
         .send()
-        .await
         .map_err(|e| {
             FastCryptoError::GeneralError(format!(
                 "Failed to get salt JWK {:?} {:?} {:?}",
@@ -368,7 +375,8 @@ pub async fn fetch_jwk_from_salt_service(
                 kid
             ))
         })?;
-    let bytes = response.bytes().await.map_err(|e| {
+
+    let bytes = response.bytes().map_err(|e| {
         FastCryptoError::GeneralError(format!(
             "Failed to get bytes {:?} {:?} {:?}",
             e.to_string(),
@@ -380,9 +388,9 @@ pub async fn fetch_jwk_from_salt_service(
     let json_str = String::from_utf8_lossy(&bytes);
     let parsed: JWKReader = serde_json::from_str(&json_str)
         .map_err(|_| FastCryptoError::GeneralError("Parse error".to_string()))?;
+
     Ok(JWK::from_reader(parsed)?)
 }
-
 
 /// Parse the JWK bytes received from the given provider and return a list of JwkId -> JWK.
 pub fn parse_jwks(
