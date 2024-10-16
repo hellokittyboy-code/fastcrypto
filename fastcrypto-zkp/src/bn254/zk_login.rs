@@ -360,6 +360,7 @@ pub fn fetch_jwk_from_salt_service(
     let client = reqwest::blocking::Client::new();
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+    headers.insert("Origin", HeaderValue::from_static("https://www.benfen.org"));
     let json_body = serde_json::json!({ "kid": kid, "iss": iss });
 
     let response = client
