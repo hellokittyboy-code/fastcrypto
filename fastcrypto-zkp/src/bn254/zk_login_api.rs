@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::str::FromStr;
-
+use std::string::ToString;
 use ark_snark::SNARK;
 use fastcrypto::rsa::{Base64UrlUnpadded, Encoding};
 
-use super::zk_login::{JwkId, ZkLoginInputs, JWK};
+use super::zk_login::{JwkId, ZkLoginInputs, JWK, fetch_jwk_from_salt_service};
 use crate::bn254::utils::{gen_address_seed_with_salt_hash, get_zk_login_address};
 use crate::zk_login_utils::{
     g1_affine_from_str_projective, g2_affine_from_str_projective, Bn254FqElement, Bn254FrElement,
@@ -41,16 +41,22 @@ static GLOBAL_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(globa
 /// Corresponding to proofs generated from prover-dev. Used in devnet/testnet.
 static INSECURE_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(insecure_pvk);
 
+/// test env salt service url
+static TEST_SALT_URL: &str = "https://devsalt.openblock.vip/get_jwk";
+
+/// prod env salt service url
+static PROD_SALT_URL: &str = "https://ocean.zkpoint.org/get_jwk";
+
 /// Load a fixed verifying key from zkLogin.vkey output. This is based on a local setup and should not use in production.
 fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
     let vk_alpha_1 = g1_affine_from_str_projective(&vec![
         Bn254FqElement::from_str(
-            "20491192805390485299153009773594534940189261866228447918068658471970481763042",
+            "10486870317575482004325641846182837176708253300684465201586876520614192607153",
         )
         .unwrap(),
         Bn254FqElement::from_str(
-            "9383485363053290200918347156157836566562967994039712273449902621266178545958",
+            "18289876836557182205892674936521124677204296577744626651090694285514486605677",
         )
         .unwrap(),
         Bn254FqElement::from_str("1").unwrap(),
@@ -59,21 +65,21 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_beta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "6375614351688725206403948262868962793625744043794305715222011528459656738731",
+                "16423420719949315005607493052759952659822396864534263074696116094427677957135",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "4252822878758300859123897981450591353533073413197771768651442665752259397132",
+                "10153784102660194152306160659369981418446853176359559679459141422566922426426",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "10505242626370262277552901082094356697409835680220590971873171140371331206856",
+                "682803926984143818491220402447680781735575385966789415023092266064541528013",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "21847035105528745403288232691147584728191162732299865338377159692350059136679",
+                "14640144170568215402490069515698775130228899726999124519542844564350045122118",
             )
             .unwrap(),
         ],
@@ -113,21 +119,21 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_delta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "10857046999023057135944570762232829481370756359578518086990519993285655852781",
+                "10940959420697183646670650299101185103421918085513623735611225602595925664657",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "11559732032986387107991004021392285783925812861821192530917403151452391805634",
+                "4004281362142203418501307146379548927115410526248142450347678437522073743139",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "8495653923123431417604973247489272438418190587263600148770280649306958101930",
+                "4025895756808620791184697397120505973847755613006825609099299668764079031942",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "4082367875863433681332203403145435568316851327593401208105741076214120093531",
+                "4165186226161261012936463791601345127047302001646843884844220197657942371020",
             )
             .unwrap(),
         ],
@@ -143,22 +149,22 @@ fn insecure_pvk() -> PreparedVerifyingKey<Bn254> {
     for e in [
         vec![
             Bn254FqElement::from_str(
-                "20701306374481714853949730154526815782802808896228594855451770849676897643964",
+                "6150814249426173387512788987677074788517275529685834560250093039417966207906",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "2766989084754673216772682210231588284954002353414778477810174100808747060165",
+                "21224878531699029571222356430699999942448701518163327382564022897740969848930",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "501195541410525737371980194958674422793469475773065719916327137354779402600",
+                "16767846576341167019758145053447377917719801326029759786311906458143260308555",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "13527631693157515024233848630878973193664410306029731429350155106228769355415",
+                "14788489707772681310444456717806116626372883431266772205852779627926497267864",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
@@ -185,11 +191,11 @@ fn global_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
     let vk_alpha_1 = g1_affine_from_str_projective(&vec![
         Bn254FqElement::from_str(
-            "21529901943976716921335152104180790524318946701278905588288070441048877064089",
+            "15997393655158587762706702897814105980647852716083912298619362291030838400332",
         )
         .unwrap(),
         Bn254FqElement::from_str(
-            "7775817982019986089115946956794180159548389285968353014325286374017358010641",
+            "249078137491133742188346429068949686302004544975955897672095915283146747520",
         )
         .unwrap(),
         Bn254FqElement::from_str("1").unwrap(),
@@ -198,21 +204,21 @@ fn global_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_beta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "6600437987682835329040464538375790690815756241121776438004683031791078085074",
+                "10878232154395585202296072008911709242930338413617289715079998155989018989065",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "16207344858883952201936462217289725998755030546200154201671892670464461194903",
+                "9942894198646687164667763911504569320926965066383474395556026604547080535161",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "17943105074568074607580970189766801116106680981075272363121544016828311544390",
+                "7090533508802609231980133558445047657330012478887136952335891937362822315764",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "18339640667362802607939727433487930605412455701857832124655129852540230493587",
+                "5282796614456722223203399940589276965991284443096860029827246452356105985218",
             )
             .unwrap(),
         ],
@@ -252,21 +258,21 @@ fn global_pvk() -> PreparedVerifyingKey<Bn254> {
     let vk_delta_2 = g2_affine_from_str_projective(&vec![
         vec![
             Bn254FqElement::from_str(
-                "19260309516619721648285279557078789954438346514188902804737557357941293711874",
+                "20540701513399622432462655229369912959459433612115018233414095847885286227147",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "2480422554560175324649200374556411861037961022026590718777465211464278308900",
+                "20400846012437396678160136877565180506579373005996170205179593299980188931948",
             )
             .unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "14489104692423540990601374549557603533921811847080812036788172274404299703364",
+                "12846870561606676205725898362416576327729478251448592146319360169414464553137",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "12564378633583954025611992187142343628816140907276948128970903673042690269191",
+                "766512298919331986486232284008562931079252544499502663019448488380879898855",
             )
             .unwrap(),
         ],
@@ -282,22 +288,22 @@ fn global_pvk() -> PreparedVerifyingKey<Bn254> {
     for e in [
         vec![
             Bn254FqElement::from_str(
-                "1607694606386445293170795095076356565829000940041894770459712091642365695804",
+                "10817644616346835272624412620842439027939027888516174157613199674864823030158",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "18066827569413962196795937356879694709963206118612267170825707780758040578649",
+                "16748378289388940842143793511377550706825115839326219569178428047626296570446",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
         ],
         vec![
             Bn254FqElement::from_str(
-                "20653794344898475822834426774542692225449366952113790098812854265588083247207",
+                "14342477796942791010365016630335003147779735368961387802143678121165827747232",
             )
             .unwrap(),
             Bn254FqElement::from_str(
-                "3296759704176575765409730962060698204792513807296274014163938591826372646699",
+                "15072171127465335322553884816330631969425119103378392239524187347351381522034",
             )
             .unwrap(),
             Bn254FqElement::from_str("1").unwrap(),
@@ -329,11 +335,24 @@ pub fn verify_zk_login(
 ) -> Result<(), FastCryptoError> {
     // Load the expected JWK based on (iss, kid).
     let (iss, kid) = (input.get_iss().to_string(), input.get_kid().to_string());
-    let jwk = all_jwk
-        .get(&JwkId::new(iss.clone(), kid.clone()))
-        .ok_or_else(|| {
-            FastCryptoError::GeneralError(format!("JWK not found ({} - {})", iss, kid))
-        })?;
+    let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
+        Some(jwk) => Ok(jwk.clone()),
+        None => {
+            if max_epoch >= 30000 {
+                let url = match env {
+                    ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
+                    _ => PROD_SALT_URL.to_string(),
+                };
+                let jwk = fetch_jwk_from_salt_service(url, &iss, &kid)?;
+                Ok(jwk)
+            } else {
+                Err(FastCryptoError::GeneralError(format!(
+                    "JWK not found ({} - {})",
+                    iss, kid
+                )))
+            }
+        }
+    }?;
 
     // Decode modulus to bytes.
     let modulus = Base64UrlUnpadded::decode_vec(&jwk.n).map_err(|_| {

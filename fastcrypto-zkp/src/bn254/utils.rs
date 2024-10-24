@@ -55,10 +55,10 @@ pub(crate) fn gen_address_seed_with_salt_hash(
     aud: &str,   // i.e. the client ID
 ) -> Result<String, FastCryptoError> {
     Ok(poseidon_zk_login(&[
+        (&Bn254FrElement::from_str(salt_hash)?).into(),
         hash_ascii_str_to_field(name, MAX_KEY_CLAIM_NAME_LENGTH)?,
         hash_ascii_str_to_field(value, MAX_KEY_CLAIM_VALUE_LENGTH)?,
         hash_ascii_str_to_field(aud, MAX_AUD_VALUE_LENGTH)?,
-        (&Bn254FrElement::from_str(salt_hash)?).into(),
     ])?
     .to_string())
 }

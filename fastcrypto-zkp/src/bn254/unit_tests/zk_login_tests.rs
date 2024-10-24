@@ -91,6 +91,91 @@ const BAD_JWK_BYTES: &[u8] = r#"{
       }"#.as_bytes();
 
 #[tokio::test]
+async fn test_verify_zk_login_google_new_global_verify_key() {
+    let user_salt = "65333839636432353363613063663730";
+
+
+    // Generate an ephemeral key pair.
+    let kp = Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32]));
+    let mut eph_pubkey = vec![0x00];
+    eph_pubkey.extend(kp.public().as_ref());
+
+
+    let kp_bigint: BigUint = BigUint::from_bytes_be(&eph_pubkey);
+    println!("Ephemeral pubkey (BigInt): {:?}", kp_bigint);
+    assert_eq!(kp_bigint.to_string(), "84029355920633174015103288781128426107680789454168570548782290541079926444544".to_string());
+
+
+    // let given_value_str = "84029355920633174015103288781128426107680789454168570548782290541079926444544";
+    // let given_value = BigUint::parse_bytes(given_value_str.as_bytes(), 10).unwrap();
+    // assert_eq!(&kp_bigint, given_value);
+
+
+
+    // let eph_pubkey = "84029355920633174015103288781128426107680789454168570548782290541079926444544".as_bytes();
+
+
+    // Get the address seed.
+    let address_seed = gen_address_seed(
+        user_salt,
+        "sub",
+        "110266505232530756199",
+        "158998245923-0hkn0ei9lg5o1s2m5pu1mrlv6822584h.apps.googleusercontent.com",
+    ).unwrap();
+    println!("address_seed={:?}", &address_seed);
+    // assert_eq!(&address_seed, "20146947183553113826982064140382936873803258282593785589105646614421053924147");
+
+
+    // Get a proof from endpoint and serialize it.
+    let zk_login_inputs = ZkLoginInputs::from_json("{\"proofPoints\":{\"a\":[\"4055833379351395660472093219702298473390338959873379801672634227234753262026\",\"20348192289306889590424516884570863425528634781366396470942806120270478526591\",\"1\"],\"b\":[[\"2624618536199413502629918555914145041360426606812483709393824245032487579344\",\"3170318453860680893371528278732019238952561694440350834197256402710838201278\"],[\"2874136893594820421775419895053784471390619453635325647187506214681486768406\",\"16367234823756482210532260601930278032613069711356560092996986716447467040330\"],[\"1\",\"0\"]],\"c\":[\"21228062810573342166347661541893753156288020120185426068704694957482216256766\",\"9121139234466683898300166691252377418598172706738911424910499936492674410068\",\"1\"]},\"issBase64Details\":{\"value\":\"yJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLC\",\"indexMod4\":1},\"headerBase64\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6ImUyNmQ5MTdiMWZlOGRlMTMzODJhYTdjYzlhMWQ2ZTkzMjYyZjMzZTIiLCJ0eXAiOiJKV1QifQ\"}", &address_seed.to_string()).unwrap();
+    println!("zk_login_inputs.get_kid()={:?}", zk_login_inputs.get_kid());
+    // assert_eq!(
+    //     zk_login_inputs.get_kid(),
+    //     "e26d917b1fe8de13382aa7cc9a1d6e93262f33e2".to_string()
+    // );
+    assert_eq!(
+        zk_login_inputs.get_iss(),
+        OIDCProvider::Google.get_config().iss
+    );
+    assert_eq!(
+        zk_login_inputs.get_address_seed().to_string(),
+        address_seed.to_string()
+    );
+    println!("zk login address={:?}",  get_zk_login_address(
+        zk_login_inputs.get_address_seed(),
+        &OIDCProvider::Google.get_config().iss
+    ));
+    // assert_eq!(
+    //     get_zk_login_address(
+    //         zk_login_inputs.get_address_seed(),
+    //         &OIDCProvider::Google.get_config().iss
+    //     )
+    //         .unwrap()
+    //         .to_vec(),
+    //     Hex::decode("0xa64ae946d5efd2dea396cb2fe81837f028c32f2b2f211176b65a3a152deb35a2").unwrap()
+    // );
+
+
+    let mut map = ImHashMap::new();
+    let content = JWK {
+        kty: "RSA".to_string(),
+        e: "AQAB".to_string(),
+        n: "2hJ7F-aJlN2hTrOelbdFB2WDlzS5oscgd5UBL_5NruogKCGFQFMk_K3d5L6N9P6mNxKr60IeGPg8zzl41iE9qQmvG9yLMA-VCW2f6gTvUkJBluYJ4wByN8Hr98tJFIvzE1q4iWclwyqiiWXyTiXfhyL0n-aMa6OgMaMLWsOFRKPEFR9ajeVqqc8GFjz4Kkij1dHWmkd_AU0wjJqDOl7wdCcLLy9bmlUwaJ4p29nRVK_KrNEL1E5PpK5Bwo6_TrXCLrAx_p3xJ5IZctwzoFkl3xpqbJOZax6s8CrHKXmG03TkEQt5a9H3bupQPaNU-bYq9E1_OvycBY6bWwD23UdwUw".to_string(),
+        alg: "RS256".to_string(),
+    };
+    map.insert(
+        JwkId::new(
+            OIDCProvider::Google.get_config().iss,
+            "e26d917b1fe8de13382aa7cc9a1d6e93262f33e2".to_string(),
+        ),
+        content,
+    );
+    let res = verify_zk_login(&zk_login_inputs, 10, &eph_pubkey, &map, &ZkLoginEnv::Test);
+    println!("error={:?}", &res);
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
 async fn test_verify_zk_login_google() {
     let user_salt = "206703048842351542647799591018316385612";
 
