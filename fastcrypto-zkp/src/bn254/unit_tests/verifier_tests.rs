@@ -37,3 +37,15 @@ fn test_fetch_jwk_from_salt_service_success() {
     println!("result={:?}", result);
     assert!(result.is_ok());
 }
+
+
+#[test]
+fn test_fetch_jwk_from_salt_service_success1() {
+    let result = fetch_jwk_from_salt_service(
+        "https://ocean.zkpoint.org/get_jwk".to_string(),
+        &"https://accounts.google.com".to_string(),
+        &"1dc0f172e8d6ef382d6d3a231f6c197dd68ce5ef".to_string(),
+    );
+    println!("result={:?}", result);
+    assert!(result.is_ok());
+}
