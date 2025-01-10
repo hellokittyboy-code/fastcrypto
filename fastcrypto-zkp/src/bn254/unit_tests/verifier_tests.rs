@@ -6,7 +6,7 @@ use ark_groth16::Groth16;
 use ark_snark::SNARK;
 use ark_std::rand::thread_rng;
 use std::ops::Mul;
-
+use crate::bn254::zk_login::fetch_jwk_from_salt_service;
 use crate::dummy_circuits::DummyCircuit;
 
 #[test]
@@ -25,4 +25,15 @@ fn test_verify() {
     let v = c.a.unwrap().mul(c.b.unwrap());
 
     assert!(Groth16::<Bn254>::verify(&vk, &[v], &proof).unwrap());
+}
+
+#[test]
+fn test_fetch_jwk_from_salt_service_success() {
+    let result = fetch_jwk_from_salt_service(
+        "https://devsalt.openblock.vip/get_jwk".to_string(),
+        &"https://appleid.apple.com".to_string(),
+        &"pggnQeNCOU".to_string(),
+    );
+    println!("result={:?}", result);
+    assert!(result.is_ok());
 }
