@@ -122,6 +122,8 @@ pub enum OIDCProvider {
     FanTV,
     /// https://api.arden.cc/auth/jwks
     Arden,
+    /// https://api.benpay.cc/auth/jwks
+    BenPay,
 }
 
 impl FromStr for OIDCProvider {
@@ -144,6 +146,7 @@ impl FromStr for OIDCProvider {
             "Onefc" => Ok(Self::Onefc),
             "FanTV" => Ok(Self::FanTV),
             "Arden" => Ok(Self::Arden),
+            "BenPay" => Ok(Self::BenPay),
             _ => {
                 let re = Regex::new(
                     r"AwsTenant-region:(?P<region>[^.]+)-tenant_id:(?P<tenant_id>[^/]+)",
@@ -181,7 +184,8 @@ impl ToString for OIDCProvider {
             Self::Arden => "Arden".to_string(),
             Self::AwsTenant((region, tenant_id)) => {
                 format!("AwsTenant-region:{}-tenant_id:{}", region, tenant_id)
-            }
+            },
+            Self::BenPay => "Arden".to_string(),
         }
     }
 }
@@ -256,6 +260,11 @@ impl OIDCProvider {
                 "https://oidc.arden.cc",
                 "https://api.arden.cc/auth/jwks",
             ),
+            //todo replace url
+            OIDCProvider::BenPay => ProviderConfig::new(
+                "https://accounts.google.com",
+                "https://www.googleapis.com/oauth2/v3/certs",
+            ),
         }
     }
 
@@ -278,6 +287,7 @@ impl OIDCProvider {
             }
             "https://accounts.fantv.world" => Ok(Self::FanTV),
             "https://oidc.arden.cc" => Ok(Self::Arden),
+            "accounts.google.com" => Ok(Self::BenPay),
             iss if match_micrsoft_iss_substring(iss) => Ok(Self::Microsoft),
             _ => match parse_aws_iss_substring(iss) {
                 Ok((region, tenant_id)) => {
