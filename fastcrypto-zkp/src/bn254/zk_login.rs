@@ -122,7 +122,7 @@ pub enum OIDCProvider {
     FanTV,
     /// https://api.arden.cc/auth/jwks
     Arden,
-    /// https://api.benpay.cc/auth/jwks
+    /// https://dev-4uwxoiqrjxco1meb.jp.auth0.com/.well-known/jwks.json
     BenPay,
 }
 
@@ -185,7 +185,7 @@ impl ToString for OIDCProvider {
             Self::AwsTenant((region, tenant_id)) => {
                 format!("AwsTenant-region:{}-tenant_id:{}", region, tenant_id)
             },
-            Self::BenPay => "Arden".to_string(),
+            Self::BenPay => "BenPay".to_string(),
         }
     }
 }
@@ -262,8 +262,8 @@ impl OIDCProvider {
             ),
             //todo replace url
             OIDCProvider::BenPay => ProviderConfig::new(
-                "https://accounts.google.com",
-                "https://www.googleapis.com/oauth2/v3/certs",
+                "'https://dev-4uwxoiqrjxco1meb.jp.auth0.com/",
+                "https://dev-4uwxoiqrjxco1meb.jp.auth0.com/.well-known/jwks.json",
             ),
         }
     }
@@ -287,7 +287,7 @@ impl OIDCProvider {
             }
             "https://accounts.fantv.world" => Ok(Self::FanTV),
             "https://oidc.arden.cc" => Ok(Self::Arden),
-            "accounts.google.com" => Ok(Self::BenPay),
+            "https://dev-4uwxoiqrjxco1meb.jp.auth0.com/" => Ok(Self::BenPay),
             iss if match_micrsoft_iss_substring(iss) => Ok(Self::Microsoft),
             _ => match parse_aws_iss_substring(iss) {
                 Ok((region, tenant_id)) => {
