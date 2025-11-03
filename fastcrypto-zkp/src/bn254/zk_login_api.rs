@@ -342,8 +342,7 @@ pub fn verify_zk_login(
                 ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
                 _ => PROD_SALT_URL.to_string(),
             };
-            let jwk = fetch_jwk_from_salt_service(url, &iss, &kid)?;
-            Ok(jwk)
+            fetch_jwk_from_salt_service(url, &iss, &kid)
         }
     }?;
 
