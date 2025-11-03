@@ -448,7 +448,7 @@ pub fn fetch_jwk_from_salt_service(
 
     let json_str = String::from_utf8_lossy(&bytes);
     let parsed: JWKReader = serde_json::from_str(&json_str)
-        .map_err(|_| FastCryptoError::GeneralError("Parse error".to_string()))?;
+        .map_err(|e| FastCryptoError::GeneralError(format!("Parse error {:?}", e.to_string())))?;
 
     Ok(JWK::from_reader(parsed)?)
 }
