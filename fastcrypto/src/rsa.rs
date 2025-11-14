@@ -8,14 +8,18 @@ use crate::hash::{HashFunction, Sha256};
 pub use base64ct::{Base64UrlUnpadded, Encoding};
 use rsa::pkcs1::DecodeRsaPublicKey;
 use rsa::pkcs1v15::Signature as ExternalSignature;
-use rsa::{BigUint, RsaPublicKey as ExternalPublicKey};
-use rsa::{Pkcs1v15Sign, PublicKey};
+use rsa::{BigUint, RsaPublicKey as ExternalPublicKey, RsaPrivateKey as ExternalPrivateKey};
+use rsa::{Pkcs1v15Sign, PublicKey, Oaep};
+use rsa::pkcs8::DecodePrivateKey;
 
 #[derive(Clone)]
 pub struct RSAPublicKey(pub ExternalPublicKey);
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct RSASignature(pub ExternalSignature);
+
+#[derive(Clone)]
+pub struct RSAPrivateKey(pub ExternalPrivateKey);
 
 impl RSAPublicKey {
     /// Parse an `RSAPublicKey` from an ASN.1 DER (Distinguished Encoding Rules) PKCS #1 encoding.
@@ -60,6 +64,19 @@ impl RSASignature {
         Ok(Self(
             ExternalSignature::try_from(bytes).map_err(|_| FastCryptoError::InvalidInput)?,
         ))
+    }
+}
+
+impl RSAPrivateKey {
+    /// https://datatracker.ietf.org/doc/html/rfc5208
+    pub fn from_bytes(pkcs8_pem: &str) -> FastCryptoResult<Self> {
+        Ok(Self(ExternalPrivateKey::from_pkcs8_pem(pkcs8_pem).map_err(|_| FastCryptoError::InvalidInput)?))
+    }
+
+    pub fn decrypt_with_oaep_sha256(&self, bytes: &[u8]) -> FastCryptoResult<String> {
+        let decrypted_bytes = ExternalPrivateKey::decrypt(&self.0, Oaep::new::<sha2::Sha256>(), bytes).map_err(|_| FastCryptoError::InvalidInput)?;
+        let decrypted_str = String::from_utf8(decrypted_bytes).map_err(|_| FastCryptoError::InvalidInput)?;
+        Ok(decrypted_str)
     }
 }
 
