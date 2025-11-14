@@ -69,7 +69,11 @@ impl RSASignature {
 
 impl RSAPrivateKey {
     /// https://datatracker.ietf.org/doc/html/rfc5208
-    pub fn from_bytes(pkcs8_pem: &str) -> FastCryptoResult<Self> {
+    pub fn from_pkcs8_der_bytes(bytes: &[u8]) -> FastCryptoResult<Self> {
+        Ok(Self(ExternalPrivateKey::from_pkcs8_der(bytes).map_err(|_| FastCryptoError::InvalidInput)?))
+    }
+
+    pub fn from_pkcs8_pem_str(pkcs8_pem: &str) -> FastCryptoResult<Self> {
         Ok(Self(ExternalPrivateKey::from_pkcs8_pem(pkcs8_pem).map_err(|_| FastCryptoError::InvalidInput)?))
     }
 
