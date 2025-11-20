@@ -338,11 +338,19 @@ pub fn verify_zk_login(
     let jwk = match all_jwk.get(&JwkId::new(iss.clone(), kid.clone())) {
         Some(jwk) => Ok(jwk.clone()),
         None => {
-            let url = match env {
-                ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
-                _ => PROD_SALT_URL.to_string(),
-            };
-            fetch_jwk_from_salt_service(url, &iss, &kid)
+            if max_epoch >= 30000 {
+                let url = match env {
+                    ZkLoginEnv::Test => TEST_SALT_URL.to_string(),
+                    _ => PROD_SALT_URL.to_string(),
+                };
+                let jwk = fetch_jwk_from_salt_service(url, &iss, &kid)?;
+                Ok(jwk)
+            } else {
+                Err(FastCryptoError::GeneralError(format!(
+                    "JWK not found ({} - {})",
+                    iss, kid
+                )))
+            }
         }
     }?;
 
