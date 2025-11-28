@@ -260,10 +260,9 @@ impl OIDCProvider {
                 "https://oidc.arden.cc",
                 "https://api.arden.cc/auth/jwks",
             ),
-            //todo replace url
             OIDCProvider::BenPay => ProviderConfig::new(
                 "https://zkoauth.com",
-                "https://benpay_oauth.openblock.vip/api/oauth2/jwks",
+                "https://zkoauth.com/api/oauth2/jwks"
             ),
         }
     }
