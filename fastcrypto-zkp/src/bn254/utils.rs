@@ -55,10 +55,10 @@ pub(crate) fn gen_address_seed_with_salt_hash(
     aud: &str,   // i.e. the client ID
 ) -> Result<String, FastCryptoError> {
     Ok(poseidon_zk_login(&[
+        (&Bn254FrElement::from_str(salt_hash)?).into(),
         hash_ascii_str_to_field(name, MAX_KEY_CLAIM_NAME_LENGTH)?,
         hash_ascii_str_to_field(value, MAX_KEY_CLAIM_VALUE_LENGTH)?,
         hash_ascii_str_to_field(aud, MAX_AUD_VALUE_LENGTH)?,
-        (&Bn254FrElement::from_str(salt_hash)?).into(),
     ])?
     .to_string())
 }
@@ -85,7 +85,7 @@ pub fn get_oidc_url(
             OIDCProvider::Credenza3 => format!("https://accounts.credenza3.com/oauth2/authorize?client_id={}&response_type=token&scope=openid+profile+email+phone&redirect_uri={}&nonce={}&state=state", client_id, redirect_url, nonce),
             OIDCProvider::Onefc => format!("https://login.onepassport.onefc.com/de3ee5c1-5644-4113-922d-e8336569a462/b2c_1a_prod_signupsignin_onesuizklogin/oauth2/v2.0/authorize?client_id={}&scope=openid&response_type=id_token&redirect_uri={}&nonce={}", client_id, redirect_url, nonce),
             OIDCProvider::Arden => format!("https://api.arden.cc/auth/authorize?client_id={}&scope=openid&response_type=id_token&redirect_uri={}&nonce={}", client_id, redirect_url, nonce),
-
+            OIDCProvider::BenPay => format!("https://accounts.zkoauth.com?client_id={}&redirect_uri={}&nonce={}", client_id, redirect_url, nonce),
             OIDCProvider::AwsTenant((region, tenant_id)) => format!("https://{}.auth.{}.amazoncognito.com/login?response_type=token&client_id={}&redirect_uri={}&nonce={}", tenant_id, region, client_id, redirect_url, nonce),
             // this URL is only useful if CLI testing from Sui is needed, can ignore if a frontend test plan is in place
             _ => return Err(FastCryptoError::InvalidInput)
