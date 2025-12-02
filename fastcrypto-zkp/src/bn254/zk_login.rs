@@ -122,7 +122,7 @@ pub enum OIDCProvider {
     FanTV,
     /// https://api.arden.cc/auth/jwks
     Arden,
-    /// https://zkoauth.com/api/oauth2/jwks   https://benpay_oauth.openblock.vip/api/oauth2/jwks
+    /// https://accounts.zkoauth.com/api/oauth2/jwks   https://benpay_oauth.openblock.vip/api/oauth2/jwks
     BenPay,
 }
 
@@ -261,8 +261,8 @@ impl OIDCProvider {
                 "https://api.arden.cc/auth/jwks",
             ),
             OIDCProvider::BenPay => ProviderConfig::new(
-                "https://zkoauth.com",
-                "https://zkoauth.com/api/oauth2/jwks"
+                "https://accounts.zkoauth.com",
+                "https://accounts.zkoauth.com/api/oauth2/jwks"
             ),
         }
     }
@@ -286,7 +286,7 @@ impl OIDCProvider {
             }
             "https://accounts.fantv.world" => Ok(Self::FanTV),
             "https://oidc.arden.cc" => Ok(Self::Arden),
-            "https://zkoauth.com" => Ok(Self::BenPay),
+            "https://accounts.zkoauth.com" => Ok(Self::BenPay),
             iss if match_micrsoft_iss_substring(iss) => Ok(Self::Microsoft),
             _ => match parse_aws_iss_substring(iss) {
                 Ok((region, tenant_id)) => {
