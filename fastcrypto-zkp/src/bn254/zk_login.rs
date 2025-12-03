@@ -262,7 +262,7 @@ impl OIDCProvider {
             ),
             OIDCProvider::BenPay => ProviderConfig::new(
                 "https://accounts.zkoauth.com",
-                "https://accounts.zkoauth.com/api/oauth2/jwks"
+                "https://benpay_oauth.openblock.vip/api/oauth2/jwks"
             ),
         }
     }
