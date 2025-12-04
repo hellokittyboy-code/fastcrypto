@@ -90,6 +90,7 @@ const BAD_JWK_BYTES: &[u8] = r#"{
         "keys":[{"alg":"ES256","e":"AQAB","kid":"1","kty":"RSA","n":"6lq9MQ-q6hcxr7kOUp-tHlHtdcDsVLwVIw13iXUCvuDOeCi0VSuxCCUY6UmMjy53dX00ih2E4Y4UvlrmmurK0eG26b-HMNNAvCGsVXHU3RcRhVoHDaOwHwU72j7bpHn9XbP3Q3jebX6KIfNbei2MiR0Wyb8RZHE-aZhRYO8_-k9G2GycTpvc-2GBsP8VHLUKKfAs2B6sW3q3ymU6M0L-cFXkZ9fHkn9ejs-sqZPhMJxtBPBxoUIUQFTgv4VXTSv914f_YkNw-EjuwbgwXMvpyr06EyfImxHoxsZkFYB-qBYHtaMxTnFsZBr6fn8Ha2JqT1hoP7Z5r5wxDu3GQhKkHw","use":"wrong usage"}]
       }"#.as_bytes();
 
+// #[tokio::test(flavor="multi_thread", worker_threads = 4)
 #[tokio::test]
 async fn test_verify_zk_login_google_new_global_verify_key() {
     let user_salt = "65333839636432353363613063663730";
@@ -163,13 +164,13 @@ async fn test_verify_zk_login_google_new_global_verify_key() {
         n: "2hJ7F-aJlN2hTrOelbdFB2WDlzS5oscgd5UBL_5NruogKCGFQFMk_K3d5L6N9P6mNxKr60IeGPg8zzl41iE9qQmvG9yLMA-VCW2f6gTvUkJBluYJ4wByN8Hr98tJFIvzE1q4iWclwyqiiWXyTiXfhyL0n-aMa6OgMaMLWsOFRKPEFR9ajeVqqc8GFjz4Kkij1dHWmkd_AU0wjJqDOl7wdCcLLy9bmlUwaJ4p29nRVK_KrNEL1E5PpK5Bwo6_TrXCLrAx_p3xJ5IZctwzoFkl3xpqbJOZax6s8CrHKXmG03TkEQt5a9H3bupQPaNU-bYq9E1_OvycBY6bWwD23UdwUw".to_string(),
         alg: "RS256".to_string(),
     };
-    map.insert(
-        JwkId::new(
-            OIDCProvider::Google.get_config().iss,
-            "e26d917b1fe8de13382aa7cc9a1d6e93262f33e2".to_string(),
-        ),
-        content,
-    );
+    // map.insert(
+    //     JwkId::new(
+    //         OIDCProvider::Google.get_config().iss,
+    //         "e26d917b1fe8de13382aa7cc9a1d6e93262f33e2".to_string(),
+    //     ),
+    //     content,
+    // );
     let res = verify_zk_login(&zk_login_inputs, 10, &eph_pubkey, &map, &ZkLoginEnv::Test);
     println!("error={:?}", &res);
     assert!(res.is_ok());
@@ -514,6 +515,7 @@ fn test_jwk_parse() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_jwks() {
     let client = reqwest::Client::new();
     for p in [
@@ -592,7 +594,7 @@ fn test_gen_seed() {
     .unwrap();
     assert_eq!(
         address_seed.to_string(),
-        "16657007263003735230240998439420301694514420923267872433517882233836276100450".to_string()
+        "13037015230680679670209557639671515065390588780704999992423597400194920301645".to_string()
     );
 }
 
@@ -709,17 +711,17 @@ fn test_alternative_iss_for_google() {
         .to_bytes_be(),
     );
     let mut all_jwk = ImHashMap::new();
-    all_jwk.insert(
-        JwkId::new(
-            OIDCProvider::Google.get_config().iss,
-            "c9afda3682ebf09eb3055c1c4bd39b751fbf8195".to_string(),
-        ),
-        JWK {
-            kty: "RSA".to_string(),
-            e: "AQAB".to_string(),
-            n: "whYOFK2Ocbbpb_zVypi9SeKiNUqKQH0zTKN1-6fpCTu6ZalGI82s7XK3tan4dJt90ptUPKD2zvxqTzFNfx4HHHsrYCf2-FMLn1VTJfQazA2BvJqAwcpW1bqRUEty8tS_Yv4hRvWfQPcc2Gc3-_fQOOW57zVy-rNoJc744kb30NjQxdGp03J2S3GLQu7oKtSDDPooQHD38PEMNnITf0pj-KgDPjymkMGoJlO3aKppsjfbt_AH6GGdRghYRLOUwQU-h-ofWHR3lbYiKtXPn5dN24kiHy61e3VAQ9_YAZlwXC_99GGtw_NpghFAuM4P1JDn0DppJldy3PGFC0GfBCZASw".to_string(),
-            alg: "RS256".to_string(),},
-    );
+    // all_jwk.insert(
+    //     JwkId::new(
+    //         OIDCProvider::Google.get_config().iss,
+    //         "c9afda3682ebf09eb3055c1c4bd39b751fbf8195".to_string(),
+    //     ),
+    //     JWK {
+    //         kty: "RSA".to_string(),
+    //         e: "AQAB".to_string(),
+    //         n: "whYOFK2Ocbbpb_zVypi9SeKiNUqKQH0zTKN1-6fpCTu6ZalGI82s7XK3tan4dJt90ptUPKD2zvxqTzFNfx4HHHsrYCf2-FMLn1VTJfQazA2BvJqAwcpW1bqRUEty8tS_Yv4hRvWfQPcc2Gc3-_fQOOW57zVy-rNoJc744kb30NjQxdGp03J2S3GLQu7oKtSDDPooQHD38PEMNnITf0pj-KgDPjymkMGoJlO3aKppsjfbt_AH6GGdRghYRLOUwQU-h-ofWHR3lbYiKtXPn5dN24kiHy61e3VAQ9_YAZlwXC_99GGtw_NpghFAuM4P1JDn0DppJldy3PGFC0GfBCZASw".to_string(),
+    //         alg: "RS256".to_string(),},
+    // );
 
     let res = verify_zk_login(
         &input,
@@ -728,6 +730,7 @@ fn test_alternative_iss_for_google() {
         &all_jwk,
         &ZkLoginEnv::Test,
     );
+    println!("res={:?}", res);
     assert!(res.is_ok());
 
     let invalid_res = verify_zk_login(

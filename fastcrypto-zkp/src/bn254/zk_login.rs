@@ -26,7 +26,9 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::error::Error;
 use std::str::FromStr;
-use reqwest::header::{HeaderMap, HeaderValue};
+use std::sync::RwLock;
+use lazy_static::lazy_static;
+use lru::LruCache;
 
 #[cfg(test)]
 #[path = "unit_tests/zk_login_tests.rs"]
@@ -43,6 +45,13 @@ const ISS: &str = "iss";
 const BASE64_URL_CHARSET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_EXT_ISS_LEN: u8 = 165;
 const MAX_ISS_LEN_B64: u8 = 4 * (1 + MAX_EXT_ISS_LEN / 3);
+
+lazy_static! {
+    static ref JWK_LRU_CACHE_RW_LOCK: RwLock<LruCache<String, JWK>> = RwLock::new({
+        let cache = LruCache::new(1000);
+        cache
+    });
+}
 
 /// Key to identify a JWK, consists of iss and kid.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord)]
@@ -416,40 +425,52 @@ pub fn fetch_jwk_from_salt_service(
     iss: &String,
     kid: &String
 ) -> Result<JWK, FastCryptoError> {
-    let client = reqwest::blocking::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-    headers.insert("Origin", HeaderValue::from_static("https://www.benfen.org"));
+    let key = format!("{}-{}", iss, kid);
+    // Access the cache
+    {
+        let readable_cache = JWK_LRU_CACHE_RW_LOCK.read()
+            .unwrap();
+        let value= readable_cache.peek(&key);
+        if value.is_some() {
+            // Clone the jwk
+            return Ok(value.unwrap().clone());
+        }
+    }
+
     let json_body = serde_json::json!({ "kid": kid, "iss": iss });
 
-    let response = client
-        .post(salt_url)
-        .headers(headers)
-        .body(json_body.to_string())
-        .send()
-        .map_err(|e| {
+    let response_body = ureq::post(salt_url)
+        .header("Content-Type", "application/json")
+        .header("Origin", "https://www.benfen.org")
+        .send(json_body.to_string())
+        .map_err(|e| FastCryptoError::GeneralError(format!(
+            "Failed to query get jwk {:?} {:?} {:?}",
+            e.to_string(),
+            iss,
+            kid
+        )))?.body_mut().read_to_string().map_err(
+        |e| {
             FastCryptoError::GeneralError(format!(
-                "Failed to get salt JWK {:?} {:?} {:?}",
+                "Failed to read bytes {:?} {:?} {:?}",
                 e.to_string(),
                 iss,
                 kid
             ))
-        })?;
+        }
+    )?;
 
-    let bytes = response.bytes().map_err(|e| {
-        FastCryptoError::GeneralError(format!(
-            "Failed to get bytes {:?} {:?} {:?}",
-            e.to_string(),
-            iss,
-            kid
-        ))
-    })?;
+    let parsed: JWKReader = serde_json::from_str(&response_body).map_err(|e| FastCryptoError::GeneralError(
+        format!("Parse JWKReader error {:?}", e.to_string())
+    ))?;
 
-    let json_str = String::from_utf8_lossy(&bytes);
-    let parsed: JWKReader = serde_json::from_str(&json_str)
-        .map_err(|e| FastCryptoError::GeneralError(format!("Parse error {:?}", e.to_string())))?;
-
-    Ok(JWK::from_reader(parsed)?)
+    let jwk = JWK::from_reader(parsed)?;
+    {
+        // Save jwk to lru cache
+        let mut writable_cache = JWK_LRU_CACHE_RW_LOCK.write()
+            .unwrap();
+        writable_cache.push(key, jwk.clone());
+    }
+    Ok(jwk)
 }
 
 /// Parse the JWK bytes received from the given provider and return a list of JwkId -> JWK.
