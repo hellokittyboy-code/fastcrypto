@@ -1445,6 +1445,7 @@ dependencies = [
  "im",
  "itertools 0.12.1",
  "lazy_static",
+ "lru",
  "neptune",
  "num-bigint 0.4.4",
  "once_cell",

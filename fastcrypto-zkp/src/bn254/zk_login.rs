@@ -19,6 +19,7 @@ use ark_groth16::Proof;
 pub use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use fastcrypto::error::FastCryptoError;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use num_bigint::BigUint;
 use regex::Regex;
 use schemars::JsonSchema;
@@ -26,6 +27,8 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::error::Error;
 use std::str::FromStr;
+use std::sync::RwLock;
+use lru::LruCache;
 use reqwest::header::{HeaderMap, HeaderValue};
 
 #[cfg(test)]
@@ -43,6 +46,14 @@ const ISS: &str = "iss";
 const BASE64_URL_CHARSET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_EXT_ISS_LEN: u8 = 165;
 const MAX_ISS_LEN_B64: u8 = 4 * (1 + MAX_EXT_ISS_LEN / 3);
+
+lazy_static! {
+    static ref JWK_LRU_CACHE_RW_LOCK: RwLock<LruCache<String, JWK>> = RwLock::new({
+        let cache = LruCache::new(1000);
+        cache
+    });
+}
+
 
 /// Key to identify a JWK, consists of iss and kid.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord)]
@@ -416,6 +427,17 @@ pub fn fetch_jwk_from_salt_service(
     iss: &String,
     kid: &String
 ) -> Result<JWK, FastCryptoError> {
+    let key = format!("{}-{}", iss, kid);
+    // Access the cache
+    {
+        let readable_cache = JWK_LRU_CACHE_RW_LOCK.read()
+            .unwrap();
+        let value= readable_cache.peek(&key);
+        if value.is_some() {
+            // Clone the jwk
+            return Ok(value.unwrap().clone());
+        }
+    }
     let client = reqwest::blocking::Client::new();
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/json"));
@@ -449,7 +471,14 @@ pub fn fetch_jwk_from_salt_service(
     let parsed: JWKReader = serde_json::from_str(&json_str)
         .map_err(|e| FastCryptoError::GeneralError(format!("Parse error {:?}", e.to_string())))?;
 
-    Ok(JWK::from_reader(parsed)?)
+    let jwk = JWK::from_reader(parsed)?;
+    {
+        // Save jwk to lru cache
+        let mut writable_cache = JWK_LRU_CACHE_RW_LOCK.write()
+            .unwrap();
+        writable_cache.push(key, jwk.clone());
+    }
+    Ok(jwk)
 }
 
 /// Parse the JWK bytes received from the given provider and return a list of JwkId -> JWK.
