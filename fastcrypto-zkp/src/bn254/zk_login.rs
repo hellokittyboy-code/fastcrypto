@@ -29,6 +29,7 @@ use std::str::FromStr;
 use std::sync::RwLock;
 use lazy_static::lazy_static;
 use lru::LruCache;
+use minreq::Method;
 
 #[cfg(test)]
 #[path = "unit_tests/zk_login_tests.rs"]
@@ -436,32 +437,32 @@ pub fn fetch_jwk_from_salt_service(
             return Ok(value.unwrap().clone());
         }
     }
-
     let json_body = serde_json::json!({ "kid": kid, "iss": iss });
 
-    let response_body = ureq::post(salt_url)
-        .header("Content-Type", "application/json")
-        .header("Origin", "https://www.benfen.org")
-        .send(json_body.to_string())
+    let response = minreq::Request::new(Method::Post, salt_url)
+        .with_header("Content-Type", "application/json")
+        .with_header("Origin", "https://www.benfen.org")
+        .with_body(json_body.to_string())
+        .send()
         .map_err(|e| FastCryptoError::GeneralError(format!(
-            "Failed to query get jwk {:?} {:?} {:?}",
+            "Failed to get salt JWK {:?} {:?} {:?}",
             e.to_string(),
             iss,
             kid
-        )))?.body_mut().read_to_string().map_err(
-        |e| {
-            FastCryptoError::GeneralError(format!(
-                "Failed to read bytes {:?} {:?} {:?}",
-                e.to_string(),
-                iss,
-                kid
-            ))
-        }
-    )?;
+        )))?;
 
-    let parsed: JWKReader = serde_json::from_str(&response_body).map_err(|e| FastCryptoError::GeneralError(
-        format!("Parse JWKReader error {:?}", e.to_string())
-    ))?;
+    let body_str = response.as_str().map_err(|e| FastCryptoError::GeneralError(format!(
+        "Failed to read response {:?} {:?} {:?}",
+        e.to_string(),
+        iss,
+        kid
+    )))?;
+
+    let parsed: JWKReader = serde_json::from_str(body_str)
+        .map_err(|e| FastCryptoError::GeneralError(format!(
+            "Parse error {:?}",
+            e.to_string()
+        )))?;
 
     let jwk = JWK::from_reader(parsed)?;
     {
