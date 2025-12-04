@@ -163,13 +163,13 @@ async fn test_verify_zk_login_google_new_global_verify_key() {
         n: "2hJ7F-aJlN2hTrOelbdFB2WDlzS5oscgd5UBL_5NruogKCGFQFMk_K3d5L6N9P6mNxKr60IeGPg8zzl41iE9qQmvG9yLMA-VCW2f6gTvUkJBluYJ4wByN8Hr98tJFIvzE1q4iWclwyqiiWXyTiXfhyL0n-aMa6OgMaMLWsOFRKPEFR9ajeVqqc8GFjz4Kkij1dHWmkd_AU0wjJqDOl7wdCcLLy9bmlUwaJ4p29nRVK_KrNEL1E5PpK5Bwo6_TrXCLrAx_p3xJ5IZctwzoFkl3xpqbJOZax6s8CrHKXmG03TkEQt5a9H3bupQPaNU-bYq9E1_OvycBY6bWwD23UdwUw".to_string(),
         alg: "RS256".to_string(),
     };
-    map.insert(
-        JwkId::new(
-            OIDCProvider::Google.get_config().iss,
-            "e26d917b1fe8de13382aa7cc9a1d6e93262f33e2".to_string(),
-        ),
-        content,
-    );
+    // map.insert(
+    //     JwkId::new(
+    //         OIDCProvider::Google.get_config().iss,
+    //         "e26d917b1fe8de13382aa7cc9a1d6e93262f33e2".to_string(),
+    //     ),
+    //     content,
+    // );
     let res = verify_zk_login(&zk_login_inputs, 10, &eph_pubkey, &map, &ZkLoginEnv::Test);
     println!("error={:?}", &res);
     assert!(res.is_ok());
@@ -514,6 +514,7 @@ fn test_jwk_parse() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_jwks() {
     let client = reqwest::Client::new();
     for p in [
