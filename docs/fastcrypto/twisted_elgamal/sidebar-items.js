@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["generate_keypair","pk_from_sk","precompute_table"],"struct":["Ciphertext","ConsistencyProof","MultiRecipientEncryption","PrivateKey","PublicKey","ZeroProof"]};

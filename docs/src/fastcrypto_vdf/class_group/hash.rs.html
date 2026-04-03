@@ -1,531 +1,296 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `fastcrypto-vdf/src/class_group/hash.rs`."><title>hash.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-081576b923113409.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="fastcrypto_vdf" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0 (129f3b996 2024-06-10)" data-channel="1.79.0" data-search-js="search-bf21c90c8c1d92b1.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../fastcrypto_vdf/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
-<a href="#2" id="2">2</a>
-<a href="#3" id="3">3</a>
-<a href="#4" id="4">4</a>
-<a href="#5" id="5">5</a>
-<a href="#6" id="6">6</a>
-<a href="#7" id="7">7</a>
-<a href="#8" id="8">8</a>
-<a href="#9" id="9">9</a>
-<a href="#10" id="10">10</a>
-<a href="#11" id="11">11</a>
-<a href="#12" id="12">12</a>
-<a href="#13" id="13">13</a>
-<a href="#14" id="14">14</a>
-<a href="#15" id="15">15</a>
-<a href="#16" id="16">16</a>
-<a href="#17" id="17">17</a>
-<a href="#18" id="18">18</a>
-<a href="#19" id="19">19</a>
-<a href="#20" id="20">20</a>
-<a href="#21" id="21">21</a>
-<a href="#22" id="22">22</a>
-<a href="#23" id="23">23</a>
-<a href="#24" id="24">24</a>
-<a href="#25" id="25">25</a>
-<a href="#26" id="26">26</a>
-<a href="#27" id="27">27</a>
-<a href="#28" id="28">28</a>
-<a href="#29" id="29">29</a>
-<a href="#30" id="30">30</a>
-<a href="#31" id="31">31</a>
-<a href="#32" id="32">32</a>
-<a href="#33" id="33">33</a>
-<a href="#34" id="34">34</a>
-<a href="#35" id="35">35</a>
-<a href="#36" id="36">36</a>
-<a href="#37" id="37">37</a>
-<a href="#38" id="38">38</a>
-<a href="#39" id="39">39</a>
-<a href="#40" id="40">40</a>
-<a href="#41" id="41">41</a>
-<a href="#42" id="42">42</a>
-<a href="#43" id="43">43</a>
-<a href="#44" id="44">44</a>
-<a href="#45" id="45">45</a>
-<a href="#46" id="46">46</a>
-<a href="#47" id="47">47</a>
-<a href="#48" id="48">48</a>
-<a href="#49" id="49">49</a>
-<a href="#50" id="50">50</a>
-<a href="#51" id="51">51</a>
-<a href="#52" id="52">52</a>
-<a href="#53" id="53">53</a>
-<a href="#54" id="54">54</a>
-<a href="#55" id="55">55</a>
-<a href="#56" id="56">56</a>
-<a href="#57" id="57">57</a>
-<a href="#58" id="58">58</a>
-<a href="#59" id="59">59</a>
-<a href="#60" id="60">60</a>
-<a href="#61" id="61">61</a>
-<a href="#62" id="62">62</a>
-<a href="#63" id="63">63</a>
-<a href="#64" id="64">64</a>
-<a href="#65" id="65">65</a>
-<a href="#66" id="66">66</a>
-<a href="#67" id="67">67</a>
-<a href="#68" id="68">68</a>
-<a href="#69" id="69">69</a>
-<a href="#70" id="70">70</a>
-<a href="#71" id="71">71</a>
-<a href="#72" id="72">72</a>
-<a href="#73" id="73">73</a>
-<a href="#74" id="74">74</a>
-<a href="#75" id="75">75</a>
-<a href="#76" id="76">76</a>
-<a href="#77" id="77">77</a>
-<a href="#78" id="78">78</a>
-<a href="#79" id="79">79</a>
-<a href="#80" id="80">80</a>
-<a href="#81" id="81">81</a>
-<a href="#82" id="82">82</a>
-<a href="#83" id="83">83</a>
-<a href="#84" id="84">84</a>
-<a href="#85" id="85">85</a>
-<a href="#86" id="86">86</a>
-<a href="#87" id="87">87</a>
-<a href="#88" id="88">88</a>
-<a href="#89" id="89">89</a>
-<a href="#90" id="90">90</a>
-<a href="#91" id="91">91</a>
-<a href="#92" id="92">92</a>
-<a href="#93" id="93">93</a>
-<a href="#94" id="94">94</a>
-<a href="#95" id="95">95</a>
-<a href="#96" id="96">96</a>
-<a href="#97" id="97">97</a>
-<a href="#98" id="98">98</a>
-<a href="#99" id="99">99</a>
-<a href="#100" id="100">100</a>
-<a href="#101" id="101">101</a>
-<a href="#102" id="102">102</a>
-<a href="#103" id="103">103</a>
-<a href="#104" id="104">104</a>
-<a href="#105" id="105">105</a>
-<a href="#106" id="106">106</a>
-<a href="#107" id="107">107</a>
-<a href="#108" id="108">108</a>
-<a href="#109" id="109">109</a>
-<a href="#110" id="110">110</a>
-<a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
-<a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a>
-<a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
-<a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
-<a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
-<a href="#149" id="149">149</a>
-<a href="#150" id="150">150</a>
-<a href="#151" id="151">151</a>
-<a href="#152" id="152">152</a>
-<a href="#153" id="153">153</a>
-<a href="#154" id="154">154</a>
-<a href="#155" id="155">155</a>
-<a href="#156" id="156">156</a>
-<a href="#157" id="157">157</a>
-<a href="#158" id="158">158</a>
-<a href="#159" id="159">159</a>
-<a href="#160" id="160">160</a>
-<a href="#161" id="161">161</a>
-<a href="#162" id="162">162</a>
-<a href="#163" id="163">163</a>
-<a href="#164" id="164">164</a>
-<a href="#165" id="165">165</a>
-<a href="#166" id="166">166</a>
-<a href="#167" id="167">167</a>
-<a href="#168" id="168">168</a>
-<a href="#169" id="169">169</a>
-<a href="#170" id="170">170</a>
-<a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
-<a href="#176" id="176">176</a>
-<a href="#177" id="177">177</a>
-<a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
-<a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
-<a href="#190" id="190">190</a>
-<a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
-<a href="#193" id="193">193</a>
-<a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-<a href="#205" id="205">205</a>
-<a href="#206" id="206">206</a>
-<a href="#207" id="207">207</a>
-<a href="#208" id="208">208</a>
-<a href="#209" id="209">209</a>
-<a href="#210" id="210">210</a>
-<a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a>
-<a href="#213" id="213">213</a>
-<a href="#214" id="214">214</a>
-<a href="#215" id="215">215</a>
-<a href="#216" id="216">216</a>
-<a href="#217" id="217">217</a>
-<a href="#218" id="218">218</a>
-<a href="#219" id="219">219</a>
-<a href="#220" id="220">220</a>
-<a href="#221" id="221">221</a>
-<a href="#222" id="222">222</a>
-<a href="#223" id="223">223</a>
-<a href="#224" id="224">224</a>
-<a href="#225" id="225">225</a>
-<a href="#226" id="226">226</a>
-<a href="#227" id="227">227</a>
-<a href="#228" id="228">228</a>
-<a href="#229" id="229">229</a>
-<a href="#230" id="230">230</a>
-<a href="#231" id="231">231</a>
-<a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
-<a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a>
-<a href="#236" id="236">236</a>
-<a href="#237" id="237">237</a>
-<a href="#238" id="238">238</a>
-<a href="#239" id="239">239</a>
-<a href="#240" id="240">240</a>
-<a href="#241" id="241">241</a>
-<a href="#242" id="242">242</a>
-<a href="#243" id="243">243</a>
-<a href="#244" id="244">244</a>
-<a href="#245" id="245">245</a>
-<a href="#246" id="246">246</a>
-<a href="#247" id="247">247</a>
-<a href="#248" id="248">248</a>
-<a href="#249" id="249">249</a>
-<a href="#250" id="250">250</a>
-<a href="#251" id="251">251</a>
-<a href="#252" id="252">252</a>
-<a href="#253" id="253">253</a>
-<a href="#254" id="254">254</a>
-<a href="#255" id="255">255</a>
-<a href="#256" id="256">256</a>
-<a href="#257" id="257">257</a>
-<a href="#258" id="258">258</a>
-<a href="#259" id="259">259</a>
-<a href="#260" id="260">260</a>
-<a href="#261" id="261">261</a>
-<a href="#262" id="262">262</a>
-<a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-</pre></div><pre class="rust"><code><span class="comment">// Copyright (c) 2022, Mysten Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
-</span><span class="kw">use </span>std::ops::{AddAssign, ShlAssign, Shr};
-
-<span class="kw">use </span>num_bigint::{BigInt, UniformBigInt};
-<span class="kw">use </span>num_integer::Integer;
-<span class="kw">use </span>num_traits::Signed;
-<span class="kw">use </span>rand::distributions::uniform::UniformSampler;
-<span class="kw">use </span>rand::{Rng, SeedableRng};
-<span class="kw">use </span>rand_chacha::ChaCha8Rng;
-
-<span class="kw">use </span>fastcrypto::error::FastCryptoError::InvalidInput;
-<span class="kw">use </span>fastcrypto::error::FastCryptoResult;
-<span class="kw">use </span>fastcrypto::hash::HashFunction;
-<span class="kw">use </span>fastcrypto::hash::Sha256;
-
-<span class="kw">use </span><span class="kw">crate</span>::class_group::discriminant::Discriminant;
-<span class="kw">use </span><span class="kw">crate</span>::class_group::QuadraticForm;
-<span class="kw">use </span><span class="kw">crate</span>::math::crt::solve_congruence_equation_system;
-<span class="kw">use </span><span class="kw">crate</span>::math::hash_prime::is_probable_prime;
-<span class="kw">use </span><span class="kw">crate</span>::math::jacobi;
-<span class="kw">use </span><span class="kw">crate</span>::math::modular_sqrt::modular_square_root;
-
-<span class="kw">impl </span>QuadraticForm {
-    <span class="doccomment">/// Generate a random quadratic form from a seed with the given discriminant. This method is deterministic and it is
-    /// a random oracle on a large subset of the class group, namely the group elements whose `a` coordinate is a
-    /// product of `k` primes all smaller than `(sqrt(|discriminant|)/2)^{1/k}`.
-    ///
-    /// Increasing `k` speeds-up the function (at least up to some break even point), but it also decreases the size of
-    /// the range of the hash function, so `k` must be picked no larger than the `k` computed in [largest_allowed_k]. If
-    /// it is larger, an [InvalidInput] error is returned. If in doubt, use the [hash_to_group_with_default_parameters]
-    /// instead.
-    ///
-    /// The algorithm is taken from https://eprint.iacr.org/2024/295.pdf.
-    </span><span class="kw">pub fn </span>hash_to_group(
-        seed: <span class="kw-2">&amp;</span>[u8],
-        discriminant: <span class="kw-2">&amp;</span>Discriminant,
-        k: u16,
-    ) -&gt; FastCryptoResult&lt;<span class="self">Self</span>&gt; {
-        <span class="comment">// Sample a and b such that a &lt; sqrt(|discriminant|)/2 and b is the square root of the discriminant modulo a.
-        </span><span class="kw">let </span>(a, <span class="kw-2">mut </span>b) = sample_modulus(discriminant, seed, k)<span class="question-mark">?</span>;
-
-        <span class="comment">// b must be odd but may be negative
-        </span><span class="kw">if </span>b.is_even() {
-            b -= <span class="kw-2">&amp;</span>a;
-        }
-
-        <span class="prelude-val">Ok</span>(QuadraticForm::from_a_b_and_discriminant(a, b, discriminant)
-            .expect(<span class="string">"a and b are constructed such that this never fails"</span>))
-    }
-
-    <span class="doccomment">/// Generate a random quadratic form from a seed with the given discriminant. This method is deterministic, and it
-    /// is a random oracle on a large subset of the class group. This method picks a default `k` parameter and calls the
-    /// [hash_to_group](QuadraticForm::hash_to_group) function with this `k`.
-    ///
-    /// This method returns an InvalidInput error if the discriminant is smaller than 800 bits.
-    </span><span class="kw">pub fn </span>hash_to_group_with_default_parameters(
-        seed: <span class="kw-2">&amp;</span>[u8],
-        discriminant: <span class="kw-2">&amp;</span>Discriminant,
-    ) -&gt; FastCryptoResult&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>k = get_default_k(discriminant.bits() <span class="kw">as </span>usize);
-        <span class="self">Self</span>::hash_to_group(seed, discriminant, k)
-    }
-}
-
-<span class="kw">fn </span>get_default_k(discriminant_bits: usize) -&gt; u16 {
-    <span class="comment">// This is chosen to ensure that the range of the hash function is large (at least 2^256) but also that the
-    // performance is near optimal, based on benchmarks.
-    </span><span class="kw">if </span>discriminant_bits &lt;= <span class="number">2048 </span>{
-        <span class="number">16
-    </span>} <span class="kw">else </span>{
-        <span class="number">32
-    </span>}
-}
-
-<span class="doccomment">/// Increasing `k` reduces the range of the hash function for a given discriminant. This function returns a choice of
-/// `k` such that the range is at least `2^256`, and chooses this it as large as possible. Consult the paper for
-/// details.
-</span><span class="kw">fn </span>largest_allowed_k(discriminant: <span class="kw-2">&amp;</span>Discriminant) -&gt; u16 {
-    <span class="kw">let </span>bits = discriminant.bits();
-    <span class="kw">let </span>lambda = <span class="number">256.0</span>;
-    <span class="kw">let </span>log_b = bits <span class="kw">as </span>f64 / <span class="number">2.0 </span>- <span class="number">1.0</span>;
-    <span class="kw">let </span>numerator = log_b - lambda;
-    <span class="kw">let </span>denominator = (log_b * <span class="number">2.0_f64</span>.ln()).log2() + <span class="number">1.0</span>;
-    (numerator / denominator).floor() <span class="kw">as </span>u16
-}
-
-<span class="doccomment">/// Sample a product of `k` primes and return this along with the square root of the discriminant modulo `a`. If `k` is
-/// larger than the largest allowed `k` (as computed in [largest_allowed_k]) for the given discriminant, an
-/// [InvalidInput] error is returned.
-</span><span class="kw">fn </span>sample_modulus(
-    discriminant: <span class="kw-2">&amp;</span>Discriminant,
-    seed: <span class="kw-2">&amp;</span>[u8],
-    k: u16,
-) -&gt; FastCryptoResult&lt;(BigInt, BigInt)&gt; {
-    <span class="comment">// This heuristic bound ensures that the range of the hash function has size at least 2^256.
-    </span><span class="kw">if </span>discriminant.bits() &lt; <span class="number">800 </span>|| k &gt; largest_allowed_k(discriminant) {
-        <span class="kw">return </span><span class="prelude-val">Err</span>(InvalidInput);
-    }
-
-    <span class="comment">// If a is smaller than this bound and |b| &lt; a, the form is guaranteed to be reduced.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bound: BigInt = discriminant.as_bigint().abs().sqrt().shr(<span class="number">1</span>);
-    <span class="kw">if </span>k &gt; <span class="number">1 </span>{
-        bound = bound.nth_root(k <span class="kw">as </span>u32);
-    }
-
-    <span class="comment">// Seed a rng with the hash of the seed
-    </span><span class="kw">let </span><span class="kw-2">mut </span>rng = ChaCha8Rng::from_seed(Sha256::digest(seed).digest);
-    <span class="kw">let </span><span class="kw-2">mut </span>factors = Vec::with_capacity(k <span class="kw">as </span>usize);
-    <span class="kw">let </span><span class="kw-2">mut </span>square_roots = Vec::with_capacity(k <span class="kw">as </span>usize);
-
-    <span class="kw">for _ in </span><span class="number">0</span>..k {
-        <span class="kw">let </span><span class="kw-2">mut </span>factor;
-        <span class="kw">loop </span>{
-            factor = sample_odd_number(<span class="kw-2">&amp;</span>bound, <span class="kw-2">&amp;mut </span>rng);
-
-            <span class="kw">if </span>factors.contains(<span class="kw-2">&amp;</span>factor) {
-                <span class="kw">continue</span>;
-            }
-
-            <span class="comment">// The primality check does not try divisions with small primes, so we do it here. This speeds up the
-            // algorithm significantly.
-            </span><span class="kw">if </span>!trial_division(<span class="kw-2">&amp;</span>factor, <span class="kw-2">&amp;</span>PRIMES) {
-                <span class="kw">continue</span>;
-            }
-
-            <span class="kw">if </span>jacobi::jacobi(discriminant.as_bigint(), <span class="kw-2">&amp;</span>factor)
-                .expect(<span class="string">"factor is odd and positive"</span>)
-                == <span class="number">1
-                </span>&amp;&amp; is_probable_prime(factor.magnitude())
-            {
-                <span class="comment">// Found a valid factor
-                </span><span class="kw">break</span>;
-            }
-        }
-        <span class="comment">// This only fails if the discriminant is not prime.
-        </span><span class="kw">let </span>square_root = modular_square_root(discriminant.as_bigint(), <span class="kw-2">&amp;</span>factor, <span class="bool-val">false</span>)
-            .map_err(|<span class="kw">_</span>| InvalidInput)<span class="question-mark">?</span>;
-        factors.push(factor);
-        square_roots.push(square_root);
-    }
-
-    <span class="kw">let </span>result = factors.iter().product();
-    <span class="kw">let </span>square_root = solve_congruence_equation_system(<span class="kw-2">&amp;</span>square_roots, <span class="kw-2">&amp;</span>factors)
-        .expect(<span class="string">"The factors are distinct primes"</span>);
-
-    <span class="prelude-val">Ok</span>((result, square_root))
-}
-
-<span class="doccomment">/// Sample a random odd number in [1, bound)
-</span><span class="kw">fn </span>sample_odd_number&lt;R: Rng&gt;(bound: <span class="kw-2">&amp;</span>BigInt, rng: <span class="kw-2">&amp;mut </span>R) -&gt; BigInt {
-    <span class="kw">let </span><span class="kw-2">mut </span>a = UniformBigInt::new(BigInt::from(<span class="number">1</span>), bound.clone().shr(<span class="number">1</span>)).sample(rng);
-    a.shl_assign(<span class="number">1</span>);
-    a.add_assign(<span class="number">1</span>);
-    a
-}
-
-<span class="doccomment">/// The odd primes smaller than 100.
-</span><span class="kw">const </span>PRIMES: [u64; <span class="number">24</span>] = [
-    <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>, <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>, <span class="number">97</span>,
-];
-
-<span class="doccomment">/// Perform trial division on `n` with the given primes. Returns true if neither of the divisors divide `n`
-</span><span class="kw">fn </span>trial_division(n: <span class="kw-2">&amp;</span>BigInt, divisors: <span class="kw-2">&amp;</span>[u64]) -&gt; bool {
-    <span class="kw">for </span>p <span class="kw">in </span>divisors {
-        <span class="kw">if </span>n.is_multiple_of(<span class="kw-2">&amp;</span>BigInt::from(<span class="kw-2">*</span>p)) {
-            <span class="kw">return </span><span class="bool-val">false</span>;
-        }
-    }
-    <span class="bool-val">true
-</span>}
-
-<span class="attr">#[cfg(test)]
-</span><span class="kw">mod </span>tests {
-    <span class="kw">use </span>num_bigint::BigInt;
-    <span class="kw">use </span>num_traits::Num;
-    <span class="kw">use </span>rand::thread_rng;
-    <span class="kw">use </span>rand::RngCore;
-
-    <span class="kw">use </span><span class="kw">crate</span>::class_group::discriminant::Discriminant;
-    <span class="kw">use </span><span class="kw">crate</span>::class_group::QuadraticForm;
-    <span class="kw">use </span><span class="kw">crate</span>::math::parameterized_group::{Parameter, ParameterizedGroupElement};
-
-    <span class="attr">#[test]
-    </span><span class="kw">fn </span>test_qf_from_seed() {
-        <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0u8</span>; <span class="number">32</span>];
-        <span class="kw">let </span>discriminant = Discriminant::from_seed(<span class="kw-2">&amp;</span>seed, <span class="number">1024</span>).unwrap();
-
-        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">10 </span>{
-            <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="kw-2">&amp;</span>seed, <span class="kw-2">&amp;</span>discriminant, <span class="number">1</span>).unwrap();
-            <span class="macro">assert!</span>(qf.is_reduced_assuming_normal());
-            <span class="macro">assert!</span>(qf.is_in_group(<span class="kw-2">&amp;</span>discriminant));
-            seed[<span class="number">0</span>] += <span class="number">1</span>;
-        }
-
-        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">10 </span>{
-            <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="kw-2">&amp;</span>seed, <span class="kw-2">&amp;</span>discriminant, <span class="number">4</span>).unwrap();
-            <span class="macro">assert!</span>(qf.is_reduced_assuming_normal());
-            <span class="macro">assert!</span>(qf.is_in_group(<span class="kw-2">&amp;</span>discriminant));
-            seed[<span class="number">0</span>] += <span class="number">1</span>;
-        }
-    }
-
-    <span class="attr">#[test]
-    </span><span class="kw">fn </span>qf_from_seed_sanity_tests() {
-        <span class="kw">let </span>discriminant = Discriminant::from_seed(<span class="string">b"discriminant seed"</span>, <span class="number">800</span>).unwrap();
-        <span class="kw">let </span>base_qf = QuadraticForm::hash_to_group(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">6</span>).unwrap();
-        <span class="macro">assert!</span>(base_qf.is_in_group(<span class="kw-2">&amp;</span>discriminant));
-
-        <span class="comment">// Same seed, same discriminant, same k
-        </span><span class="kw">let </span>other_qf = QuadraticForm::hash_to_group(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">6</span>).unwrap();
-        <span class="macro">assert_eq!</span>(base_qf, other_qf);
-
-        <span class="comment">// Smaller k
-        </span><span class="kw">let </span>other_qf = QuadraticForm::hash_to_group(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">5</span>).unwrap();
-        <span class="macro">assert_ne!</span>(base_qf, other_qf);
-
-        <span class="comment">// Larger k
-        </span><span class="kw">let </span>other_qf = QuadraticForm::hash_to_group(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">7</span>).unwrap();
-        <span class="macro">assert_ne!</span>(base_qf, other_qf);
-
-        <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0u8</span>; <span class="number">32</span>];
-        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">10 </span>{
-            <span class="comment">// Different seed
-            </span>thread_rng().fill_bytes(<span class="kw-2">&amp;mut </span>seed);
-            <span class="kw">let </span>other_qf = QuadraticForm::hash_to_group(<span class="kw-2">&amp;</span>seed, <span class="kw-2">&amp;</span>discriminant, <span class="number">6</span>).unwrap();
-            <span class="macro">assert_ne!</span>(base_qf, other_qf);
-        }
-
-        <span class="kw">let </span>other_discriminant = Discriminant::from_seed(<span class="string">b"other discriminant seed"</span>, <span class="number">800</span>).unwrap();
-        <span class="comment">// Same seed, same k, other discriminant
-        </span><span class="kw">let </span>other_qf = QuadraticForm::hash_to_group(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>other_discriminant, <span class="number">6</span>).unwrap();
-        <span class="macro">assert_ne!</span>(base_qf, other_qf);
-    }
-
-    <span class="attr">#[test]
-    </span><span class="kw">fn </span>qf_from_seed_regression_tests() {
-        <span class="kw">let </span>discriminant = Discriminant::from_trusted_bigint(-BigInt::from_str_radix(<span class="string">"c3811f4ad2f4a7bdf2ed89385866ad526c6dd3aa942e04c141d0562a8e7b014f08804f47b3c2ecbba0a5a0ad8f4d8e869a10cff13dbc522aea141f6d1c42913f2d3bff8d3e7656c72523a2e9d47f838234bd65f05ef3ca86c2f640bca6630ed8d1da21e30a67f83e25b89c32c2d0dc0bacb81bd971b0932a82d131b4a74bff36b60b66543105da2c3ecb1a4e8c2cb6d47c1e85942cce8f3fc50c27856e6dfbd15c0bd5017fea15ae0eb43dfb32b2d947c3131d1951f00bcc40352eeb65e364551e40d13768f443406760ee6b37a5b5819d3f630c034c7f42212ad49c803772aaafd4cd1f87697c68d5a6b0855f475b370b20058558993e76759caa38edbc82407b4e3559bade5f7479a860ebef62fed82d657765ebb8f7f375c2b78f73669760e4bd4932177087a49a0b68d7"</span>, <span class="number">16</span>).unwrap());
-
-        <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">64</span>).unwrap();
-        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"8b0104397d87d59220ec1bbbf79f471689ad0a48f67625abed478749b2f110d79990684b782160a7e00288c240160d10da0198298fd68f7e3fa0964975f1816d5bb38c978ea1bc9fb5aaefa62971435de9565801c80e545b497d00783c0d518722311c6fa7e924bff4f4765f6f3c6b3de8dcf1c314e7ea8df998de524af394e5cec7dfc867cf07f7eb501dfc279102ff304620732b3d44d3ceeadbd054e20eb953eed85ac684044b1192c1ccaeb9ba79695b28204e7148e8560e4b782c6b20ea20123bda9061eed1920d7ff1fd9741220ee1fac09f596524a12aa993734f2fa4ccf792d46c3bf8320073def0c938e6fb608b8866f70fc380f1a37f3fd9c52935837f5ff06ef6ab882599460e7b950ab17a75602a0b29523ab99c4d030923244a5a9e0431759c59a33a471641c013dadaebdc711baf3a05320330959f13b88c6619c64201bc10517c0bbc69524e6d3345eaeade453ea1ebe8b4ce41068e321399c41e8a90831f9713aa2df564423dfa2fe36e65ccf8157c9ebd24f4ac545482b1a609b7bce94316af8e53cbe191ba073b312a60831ea1f657a92ded17350710ed960309f9853536dd6c8dc45ed0069b1feb7e4acbc7adcf15252e96d5c35e37afbd5b6c413c8511e8225b0f938ae03225b5f2a856aed3551f424795b08807fdc0e38566acdebd699e4db85cf216e3467e9ca3d6c82cfaf77d8446e612de64b1fd3a5df8c5a982df1470daf56f3a15787b35439769c6003693c9b88bf14962b40995931baad12c0e00ac9456556deee599db40209dffe5ebf04f193776ba1dbf3c6fa1a81daafb80ec83e9ce0f8365b8f8fffedf13fe1c2d34d12c2bc5c3c223dd1ea6158645d229e65ccf774c04e4aa4715a67d20f2a20752553c30410651990bbb27d1be95c8b690c7a4edd6450ecbeef312e862944c3eeac7ad25541c14aa6c3da7c14bb4ab6119be67dda0ff244b18711c3da20570ecc1536c3c5cfe297bce254df07fe52d05f54d59272d1fe8c6b30c0eb60a6154b86c71e48379a109986a3632dea79fa0e77fe49931abae8a9188163dc388e772342c0f66d90791a3dd8e337211884aea2b7c2f7920862ade85b6e93d4b1e6afe44a0bf62ed509917cde6ef93a8f6dcd763831652e5c193b7b7ed7d9bb937d1ca1870"</span>).unwrap());
-
-        <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">32</span>).unwrap();
-        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"91010131e81a0ad42da693099a5c3756a494a32be2f80055634b6ffad271b03a1da3d4fd94d310d63ba16dcfaff8ec034215db89aac493573a399d3ecd0db3418234a96ad8cd92f93b3f9d5964e1e7b6d89c4ea7cecaf8a8b86d3ea039b5b47d76cba90539317efc131a8d25b14c2effe966ffdde5151babfe3f5604c1edbc82132c66a8941edd2fa3392b101770d3e0cb90c19702e4aa2da476751cc4ff0a848db4dfbe56ee3e9f09922b3f55c8a0374a2c296fc5a73fc259375d2a931c8e1515cb872005ed5a50ee85ee663b6130254d389c4092d945490e92deeaf27f91d684509ec1b9dd718f01a041d3ade398fac284c3b220950c8832d030d6b0236fa5e6626f63ec0be64f66d82cdcb45f70a169a2c0fff664d1c37f8fafc0153b9f6aeeff986bf056ec5953fc362fcb229a359053f1393a6cbdecc8a0b3e5853be996b0d0ba7a660c00ed6728f4762f01009c8b8ad12b493e8f3e3e9d58837e42372586101e585d40a1715271afe41fe435a57921bd9acd4fcbadfd4e4396812727c3c5fe100296e01d3baa8d9bbc37904080dfcb4860ba8476ac1a0af200244fc8028e71ff7b3a58a85341cb0cdf9e03009c53fa427eea51d6703ddba90c70752d84d76685cb64596f335f74445d15d6463516126d2d3fc32871d472192a555847da6dbccb08396013a444c2f900de32ae5df6bdd8bdc7e870eef02f5a953194d831baaa8f653fc59fb3513b0c3ec5206dd3c41c0ee72f70ddba4d3ae0245928ceb1b0d8f59f5133d0f7647187094652cf6773aab2d05fa0a0b161ba19ae4f954c2d80bfdacb0c51ee2d5ad1b25240e348b4472db239d2dbc6864af6e1425d88a94b3ce8a8f6d754799c59609ab095a469cda07869fff1ad558fe0517a6c35018d224ca52af18537e460345e38a579af48b1043392312d8ed9c868f72993d092843c939817102e89db737c3509eea800be399800de35570a0d255369b9c49013e208c598570a6c888424651ed5b371bedfc571c30e39d971d262bdf3a4b4d60b5f29ec7fac14b8fcb4c654d346c7313113c027605bce2c2464827ff44f1b839be19025014cf8d291455bc67aa4277edd4e3ded467778611d3f7da4e3002eef718a5110b000af428dc3be5e59e89ec798f56310b099464e7c765b8f1c84f1e67205feb6376338925be58657093046"</span>).unwrap());
-
-        <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">16</span>).unwrap();
-        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"9401031797d54ddb89c329b525b1aa6e3f1e193d93056b3c19d34b422c0f65212f9abacb807116fff67eeac9e73c8aa6e57a8eecea4e3fb78551d277831baf6e657afbfe99c063af48fd67a6f9b48174f9f4207caaba39eb90bbe09318597473fb281bc3e95ea6dc8ad773c826d4a97452253f7c7662593bee386d0d1d4a7596ea810661e0391c0ab005642dc1dcc33649340c408dc194022d85bd17b5e06fc59ab741554454d0450e12b4007c0aae9bb68ca4d9f1edac4fcd1577d8a4b23ea5d487f11acee384e71e4c6037b17cd60c496c099be926d21b52bfabccfe4e402abac837b9b0818ef0e4172039baf9d46a3c2864866870df86e8f1e3bd813a53b2d217d0234bfe67f245398aad77f8db7cde11c259f247ae96d5af982ddf8cf7dad2b0225eece2de9ee00c83fb8cb32ba7f77599033b4a2ad35712ab0cc6eb69d67cfde5b6647fca0ebb9b3a7db0092bd8a31c509dfea38d961fe24ad5fa68f73ae5bd5b42538cfe62874e8a8d0f72f52492524791ad51d70e433dcd988033ab4be061cdab0b9b7d960625cde8430dd16e02b2bb1ff510231f59262dd93a796ccf99825f3f1144e58667303509950300a78b3c507be066b2aa31ed2cbbc4de664d27561825164240eb639860a561c0bd8abe11790dc875f2a13c6171c9eda777a03f5a4258b99639ded20b938c5c494223aa72e9d612471ae0e54967af8730bd54a32e408511adcab4816a95b1c9924f56adaf60be01715c02fb80b35f531cf1298f661fe8e40cf1f800444a291e26303e79291db8900067069fe203e97376b88f6ada38ece7e04f87241fd1bb395076621c0a339cb283ca960a8252d95f4d4fe0c3435943285ca9de7df811fd1642862a9fdacb258ed05e27cbf7001b7804a0421f5ae0eca95dce9aa5c6d8b873ee0eb696db556d4e12c246eacf93c1e6f2feee2a73301540101cf2154c94cc2ef7a656e0d65aa78316756b875d27100d151b1cbf5dabb185429ed20693a7a395703f99e27e88c7b5b919fec492e59299b8bb1abcf451ac7f0ec4789dbf4a95835a5da0569f83440045a654e28d313212dd56b01627c6edf27f261dd75336bda675f698887771b9afd28ca8b3379cbbcffb373cb8803738e48fd5f286f77c40c1bc94e47eccefce38be9de1be9a22751634bf6cd2cf4a"</span>).unwrap());
-
-        <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">8</span>).unwrap();
-        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"950166d2bf1d0ad57988b9b6a789fc2acab4ae89fa080022a9cc9566a5c0b67cf4f6d1a2a7ad0d4488ecea1c59cec64de1d424273065e2186a08a8ee37fc8f7a2cc34a167224133f78e47eceb3dc9781655289ed9c988f5267f5ba3fb1173d7f52071e9b9a3bf196b6db657c227245222b6871c04e2956d37543d8b3f422722c486b10e82bff46b35c15415e1dbbf5b0f84159dd961aef8502fed697e8c66401370be358a98d8648f0385bf2a72705767f8a37b8c3bd0a0c7824944b4ff1b109094d6fa19e063d5a3ec1a8475f9820bbc9ce10cb45095de0daeaa227277a87d6aefff2068c8cbd95358b54a4ed151a86858362b91f86b283707239c2d4661a847917508fe3ec8df2f928879b4a3ebea2373daa233314fd1c36f4ee264f1e1913c54bc388f6b911f9ba322bd33361db6988acf37589332459068175ede93967f8ea9442e77117e22d7d8c53a42b1a3279c357068df9584ac2b6024b952a9ba7011469a37cd470d9d8443bde67c696b2cee2cd55ad5da2d34c9b63f132bc2c4182f415d72c8343ab313ba4ad527ab886badec927fc0f1d829f894a3a34a32df40200d70e22e98c42fa7b109e6c3fcc6a36f423efee520d588e0fb4a78e2bb997f3c6162c3cec1363150406e3142b4716f8c148e91d0d4cc818cb330b0bbd14ecfe39145ee71b36018366f417774554181437d1787458cc8fd3f0c25a27696de5e285209fcfe2cad01be819c1c16027903033114e56a049e4a57f5afe8d87e6032c107a77caeec944aeb3e707af8a446e17b07aa2e6c551eb768037ad96ca1f28939cd8154cd7f98abed95ae96920f88a820d1cdc4ed8bff892bede47606bd4c6c3f4431256ecf3ff3aeecd668aa4a1da0c90a14562e172bf32c281a83f688cda5fcb756c9d353c9a665744ba94332212f87ab512ae36778cf0e760c35500158163accb440b24713a48b789c03da2e348b99234277055dce5d92a05b9587a4cd283739c7ae4c8552d4d7088946ce693de313f955eee31c1f5d2aa3087dd9d3629ab9c95ab0ee7659b1e0a49d4bb6a441f821b88b88d7cec5fd225f6dcd076608b1f80c6561c43b747bebdbc3e636bb29e7675474b50"</span>).unwrap());
-
-        <span class="kw">let </span>qf = QuadraticForm::hash_to_group(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">4</span>).unwrap();
-        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"960102d12a2199c0d002e25d9f3ab2972ca4a625d272801e86da11690b28ce005e83ac8f58d6ff97945d2e15a6fba11dd37b3ada8ef8cc2e8fe505fcc470dbd76562992c9ac14f02febcd05ee14dae7f611cce78676d1301dfc97c8c2c0d49ee00a5d6bd9ab50540a533518c7cf58f7756a74595ae10a759d0cd6e72f557193a1a7d7a68ec180bb985aef1f1f64ed10637041069d343de99e001f9e5bf7c4c79a58012dcbf3c8c062dd4971ab88176c6dfd1ce314d85f98c31ba67c1dd99ce3f7d2a04be56deaec618436e6cc5fc68d9417d955478f04dfc0af4e85726e3f1c0a7d9613d3b994035efbd1fcc90a2186895f43732b787b717211b882227496de79dd3cb6d3387ee8041a6d9a9dfa83af3fbbe57e89b408077241fe0aef8dd585982205c7d846921421ffcc84e455cd60fa9c15f13b31d5e1a96f4ed37506571baf9eb935f8b7aa184b94ea3662db78cda03164e34490c7cf2e74c4cc68793e855b0c0d1e3a4c7683102a114480629f5373bcac4ea28e6a0601a3baa02034e12ac78243002acf5441c693308133fbff6e1aa6e5ab5c904cf41f94febd3a2847b54e516c9ca42bbc08695cd3ab07f4d1ca8d41108bf552cdbdebdd3a3cfcb3d296245b86ec788c4315f8ce03565e5bc6cf27babc4585874ee1cc64dd487fc7c43a1c82ab47783d05c7a7347cd6efe0645a746ce3a131649a8047a832665232be81d006da67ed832691ba8d32e9374b2f38a40d127dd677d011f2d9840b27b4817bb3bd98083c7260dc8ec9ccc75ab19512a05a6e36cf27518415b2f65adc79fab3cbf71836b07a6395870c4b55d8d973266a0658e497effe0ecf23a2109b68a8d8b6c8d33d122122f9787a3d63b0c85b2698156d759cfb4d8a1fb656ca002d9c84c7ec74fddccbe097c73a36fc8a4f51b29374970e16c8da0ad99cc0d18e48323376757205a6efc"</span>).unwrap());
-    }
-
-    <span class="attr">#[test]
-    </span><span class="kw">fn </span>qf_default_hash_test() {
-        <span class="kw">let </span>discriminant = Discriminant::from_trusted_bigint(-BigInt::from_str_radix(<span class="string">"c3811f4ad2f4a7bdf2ed89385866ad526c6dd3aa942e04c141d0562a8e7b014f08804f47b3c2ecbba0a5a0ad8f4d8e869a10cff13dbc522aea141f6d1c42913f2d3bff8d3e7656c72523a2e9d47f838234bd65f05ef3ca86c2f640bca6630ed8d1da21e30a67f83e25b89c32c2d0dc0bacb81bd971b0932a82d131b4a74bff36b60b66543105da2c3ecb1a4e8c2cb6d47c1e85942cce8f3fc50c27856e6dfbd15c0bd5017fea15ae0eb43dfb32b2d947c3131d1951f00bcc40352eeb65e364551e40d13768f443406760ee6b37a5b5819d3f630c034c7f42212ad49c803772aaafd4cd1f87697c68d5a6b0855f475b370b20058558993e76759caa38edbc82407b4e3559bade5f7479a860ebef62fed82d657765ebb8f7f375c2b78f73669760e4bd4932177087a49a0b68d7"</span>, <span class="number">16</span>).unwrap());
-
-        <span class="kw">let </span>qf =
-            QuadraticForm::hash_to_group_with_default_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant).unwrap();
-        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"91010131e81a0ad42da693099a5c3756a494a32be2f80055634b6ffad271b03a1da3d4fd94d310d63ba16dcfaff8ec034215db89aac493573a399d3ecd0db3418234a96ad8cd92f93b3f9d5964e1e7b6d89c4ea7cecaf8a8b86d3ea039b5b47d76cba90539317efc131a8d25b14c2effe966ffdde5151babfe3f5604c1edbc82132c66a8941edd2fa3392b101770d3e0cb90c19702e4aa2da476751cc4ff0a848db4dfbe56ee3e9f09922b3f55c8a0374a2c296fc5a73fc259375d2a931c8e1515cb872005ed5a50ee85ee663b6130254d389c4092d945490e92deeaf27f91d684509ec1b9dd718f01a041d3ade398fac284c3b220950c8832d030d6b0236fa5e6626f63ec0be64f66d82cdcb45f70a169a2c0fff664d1c37f8fafc0153b9f6aeeff986bf056ec5953fc362fcb229a359053f1393a6cbdecc8a0b3e5853be996b0d0ba7a660c00ed6728f4762f01009c8b8ad12b493e8f3e3e9d58837e42372586101e585d40a1715271afe41fe435a57921bd9acd4fcbadfd4e4396812727c3c5fe100296e01d3baa8d9bbc37904080dfcb4860ba8476ac1a0af200244fc8028e71ff7b3a58a85341cb0cdf9e03009c53fa427eea51d6703ddba90c70752d84d76685cb64596f335f74445d15d6463516126d2d3fc32871d472192a555847da6dbccb08396013a444c2f900de32ae5df6bdd8bdc7e870eef02f5a953194d831baaa8f653fc59fb3513b0c3ec5206dd3c41c0ee72f70ddba4d3ae0245928ceb1b0d8f59f5133d0f7647187094652cf6773aab2d05fa0a0b161ba19ae4f954c2d80bfdacb0c51ee2d5ad1b25240e348b4472db239d2dbc6864af6e1425d88a94b3ce8a8f6d754799c59609ab095a469cda07869fff1ad558fe0517a6c35018d224ca52af18537e460345e38a579af48b1043392312d8ed9c868f72993d092843c939817102e89db737c3509eea800be399800de35570a0d255369b9c49013e208c598570a6c888424651ed5b371bedfc571c30e39d971d262bdf3a4b4d60b5f29ec7fac14b8fcb4c654d346c7313113c027605bce2c2464827ff44f1b839be19025014cf8d291455bc67aa4277edd4e3ded467778611d3f7da4e3002eef718a5110b000af428dc3be5e59e89ec798f56310b099464e7c765b8f1c84f1e67205feb6376338925be58657093046"</span>).unwrap());
-    }
-}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `fastcrypto-vdf/src/class_group/hash.rs`."><title>hash.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="fastcrypto_vdf" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.1 (e408947bf 2026-03-25)" data-channel="1.94.1" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">fastcrypto_vdf/class_group/</div>hash.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="comment">// Copyright (c) 2022, Mysten Labs, Inc.
+<a href=#2 id=2 data-nosnippet>2</a>// SPDX-License-Identifier: Apache-2.0
+<a href=#3 id=3 data-nosnippet>3</a>
+<a href=#4 id=4 data-nosnippet>4</a></span><span class="kw">use </span>lazy_static::lazy_static;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>num_bigint::{BigInt, Sign};
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>num_integer::Integer;
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>num_traits::{One, Signed};
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>rand::{Rng, SeedableRng};
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>rand_chacha::ChaCha8Rng;
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>std::ops::{Shl, Shr};
+<a href=#11 id=11 data-nosnippet>11</a>
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>fastcrypto::error::FastCryptoError::InvalidInput;
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>fastcrypto::error::FastCryptoResult;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>fastcrypto::hash::HashFunction;
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>fastcrypto::hash::Sha256;
+<a href=#16 id=16 data-nosnippet>16</a>
+<a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span><span class="kw">crate</span>::class_group::discriminant::Discriminant;
+<a href=#18 id=18 data-nosnippet>18</a><span class="kw">use </span><span class="kw">crate</span>::class_group::QuadraticForm;
+<a href=#19 id=19 data-nosnippet>19</a><span class="kw">use </span><span class="kw">crate</span>::math::crt::solve_congruence_equation_system;
+<a href=#20 id=20 data-nosnippet>20</a><span class="kw">use </span><span class="kw">crate</span>::math::hash_prime::is_probable_prime;
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">use </span><span class="kw">crate</span>::math::jacobi;
+<a href=#22 id=22 data-nosnippet>22</a><span class="kw">use </span><span class="kw">crate</span>::math::modular_sqrt::modular_square_root;
+<a href=#23 id=23 data-nosnippet>23</a>
+<a href=#24 id=24 data-nosnippet>24</a><span class="doccomment">/// The security parameter for the hash function in bits. The image will be at least
+<a href=#25 id=25 data-nosnippet>25</a>/// 2^{2*SECURITY_PARAMETER} large to ensure that the hash function is collision resistant.
+<a href=#26 id=26 data-nosnippet>26</a></span><span class="kw">const </span>SECURITY_PARAMETER_IN_BITS: u64 = <span class="number">128</span>;
+<a href=#27 id=27 data-nosnippet>27</a>
+<a href=#28 id=28 data-nosnippet>28</a><span class="doccomment">/// This lower limit ensures that the default, secure parameters set below give valid results,
+<a href=#29 id=29 data-nosnippet>29</a>/// namely a reduced quadratic form.
+<a href=#30 id=30 data-nosnippet>30</a></span><span class="kw">const </span>MINIMAL_DISCRIMINANT_SIZE: u64 = <span class="number">600</span>;
+<a href=#31 id=31 data-nosnippet>31</a>
+<a href=#32 id=32 data-nosnippet>32</a><span class="doccomment">/// The image size of the hash function will be "Number of primes of size at most
+<a href=#33 id=33 data-nosnippet>33</a>/// DEFAULT_PRIME_FACTOR_SIZE_IN_BYTES" * DEFAULT_PRIME_FACTORS, so these have been set such that
+<a href=#34 id=34 data-nosnippet>34</a>/// the image is ~260 bits. See [n_bit_primes] for the details of this computation.
+<a href=#35 id=35 data-nosnippet>35</a></span><span class="kw">const </span>DEFAULT_PRIME_FACTORS: u64 = <span class="number">2</span>;
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a><span class="doccomment">/// The default size of the prime factors should be set such that it is not possible for an
+<a href=#38 id=38 data-nosnippet>38</a>/// adversary to precompute the VDF on all quadratic forms with the first coordinate being the
+<a href=#39 id=39 data-nosnippet>39</a>/// primes of this size. This is an issue because if an adversary can precompute (a1, _, _)^T and
+<a href=#40 id=40 data-nosnippet>40</a>/// (a2, _, _)^T then it is possible to compute (a1*a2, _, _)^T as the composition (a1, _, _)^T *
+<a href=#41 id=41 data-nosnippet>41</a>/// (a2, _, _)^T.
+<a href=#42 id=42 data-nosnippet>42</a></span><span class="kw">const </span>DEFAULT_PRIME_FACTOR_SIZE_IN_BYTES: u64 = <span class="number">17</span>;
+<a href=#43 id=43 data-nosnippet>43</a>
+<a href=#44 id=44 data-nosnippet>44</a><span class="kw">impl </span>QuadraticForm {
+<a href=#45 id=45 data-nosnippet>45</a>    <span class="doccomment">/// Generate a random quadratic form from a seed with the given discriminant. This method is
+<a href=#46 id=46 data-nosnippet>46</a>    /// deterministic, and it is a random oracle on a large subset of the class group.
+<a href=#47 id=47 data-nosnippet>47</a>    ///
+<a href=#48 id=48 data-nosnippet>48</a>    /// This method returns an [InvalidInput] error if the discriminant is so small that there are
+<a href=#49 id=49 data-nosnippet>49</a>    /// no secure parameters, and it may also happen if the discriminant is not a prime.
+<a href=#50 id=50 data-nosnippet>50</a>    </span><span class="kw">pub fn </span>hash_to_group_with_default_parameters(
+<a href=#51 id=51 data-nosnippet>51</a>        seed: <span class="kw-2">&amp;</span>[u8],
+<a href=#52 id=52 data-nosnippet>52</a>        discriminant: <span class="kw-2">&amp;</span>Discriminant,
+<a href=#53 id=53 data-nosnippet>53</a>    ) -&gt; FastCryptoResult&lt;<span class="self">Self</span>&gt; {
+<a href=#54 id=54 data-nosnippet>54</a>        <span class="kw">if </span>discriminant.bits() &lt;= MINIMAL_DISCRIMINANT_SIZE {
+<a href=#55 id=55 data-nosnippet>55</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(InvalidInput);
+<a href=#56 id=56 data-nosnippet>56</a>        }
+<a href=#57 id=57 data-nosnippet>57</a>        hash_to_group_with_custom_parameters(
+<a href=#58 id=58 data-nosnippet>58</a>            seed,
+<a href=#59 id=59 data-nosnippet>59</a>            discriminant,
+<a href=#60 id=60 data-nosnippet>60</a>            DEFAULT_PRIME_FACTOR_SIZE_IN_BYTES,
+<a href=#61 id=61 data-nosnippet>61</a>            DEFAULT_PRIME_FACTORS,
+<a href=#62 id=62 data-nosnippet>62</a>        )
+<a href=#63 id=63 data-nosnippet>63</a>    }
+<a href=#64 id=64 data-nosnippet>64</a>}
+<a href=#65 id=65 data-nosnippet>65</a>
+<a href=#66 id=66 data-nosnippet>66</a><span class="doccomment">/// Generate a random quadratic form from a seed with the given discriminant and custom parameters.
+<a href=#67 id=67 data-nosnippet>67</a>///
+<a href=#68 id=68 data-nosnippet>68</a>/// The output will be a uniformly random element from the set of points (a,b,c) where a = p_1 ... p_k
+<a href=#69 id=69 data-nosnippet>69</a>/// for some primes p_i &lt; 2^lambda.
+<a href=#70 id=70 data-nosnippet>70</a>///
+<a href=#71 id=71 data-nosnippet>71</a>/// If the discriminant is not a negative prime, an [InvalidInput] error may be returned.
+<a href=#72 id=72 data-nosnippet>72</a>///
+<a href=#73 id=73 data-nosnippet>73</a>/// The parameters must be chosen carefully to ensure that the function is secure and for all
+<a href=#74 id=74 data-nosnippet>74</a>/// use cases, [hash_to_group] should be used.
+<a href=#75 id=75 data-nosnippet>75</a></span><span class="kw">fn </span>hash_to_group_with_custom_parameters(
+<a href=#76 id=76 data-nosnippet>76</a>    seed: <span class="kw-2">&amp;</span>[u8],
+<a href=#77 id=77 data-nosnippet>77</a>    discriminant: <span class="kw-2">&amp;</span>Discriminant,
+<a href=#78 id=78 data-nosnippet>78</a>    prime_factor_size_in_bytes: u64,
+<a href=#79 id=79 data-nosnippet>79</a>    prime_factors: u64,
+<a href=#80 id=80 data-nosnippet>80</a>) -&gt; FastCryptoResult&lt;QuadraticForm&gt; {
+<a href=#81 id=81 data-nosnippet>81</a>    <span class="comment">// Ensure that the image is sufficiently large
+<a href=#82 id=82 data-nosnippet>82</a>    </span><span class="macro">debug_assert!</span>(
+<a href=#83 id=83 data-nosnippet>83</a>        prime_factors <span class="kw">as </span>f64 * n_bit_primes(prime_factor_size_in_bytes * <span class="number">8</span>)
+<a href=#84 id=84 data-nosnippet>84</a>            &gt;= <span class="number">2.0 </span>* SECURITY_PARAMETER_IN_BITS <span class="kw">as </span>f64
+<a href=#85 id=85 data-nosnippet>85</a>    );
+<a href=#86 id=86 data-nosnippet>86</a>
+<a href=#87 id=87 data-nosnippet>87</a>    <span class="comment">// Ensure that the prime factors are so large that the corresponding quadratic form cannot be precomputed.
+<a href=#88 id=88 data-nosnippet>88</a>    </span><span class="macro">debug_assert!</span>(
+<a href=#89 id=89 data-nosnippet>89</a>        n_bit_primes(prime_factor_size_in_bytes * <span class="number">8</span>) &gt;= SECURITY_PARAMETER_IN_BITS <span class="kw">as </span>f64
+<a href=#90 id=90 data-nosnippet>90</a>    );
+<a href=#91 id=91 data-nosnippet>91</a>
+<a href=#92 id=92 data-nosnippet>92</a>    <span class="comment">// Ensure that the result will be reduced
+<a href=#93 id=93 data-nosnippet>93</a>    </span><span class="macro">debug_assert!</span>(
+<a href=#94 id=94 data-nosnippet>94</a>        discriminant.as_bigint().abs().sqrt().shr(<span class="number">1</span>)
+<a href=#95 id=95 data-nosnippet>95</a>            &gt; BigInt::one().shl(prime_factors * prime_factor_size_in_bytes)
+<a href=#96 id=96 data-nosnippet>96</a>    );
+<a href=#97 id=97 data-nosnippet>97</a>
+<a href=#98 id=98 data-nosnippet>98</a>    <span class="comment">// Sample a and b such that a &lt; sqrt(|discriminant|)/2 has exactly prime_factors prime factors and b is the square root of the discriminant modulo a.
+<a href=#99 id=99 data-nosnippet>99</a>    </span><span class="kw">let </span>(a, <span class="kw-2">mut </span>b) = sample_modulus(
+<a href=#100 id=100 data-nosnippet>100</a>        seed,
+<a href=#101 id=101 data-nosnippet>101</a>        discriminant,
+<a href=#102 id=102 data-nosnippet>102</a>        prime_factor_size_in_bytes,
+<a href=#103 id=103 data-nosnippet>103</a>        prime_factors,
+<a href=#104 id=104 data-nosnippet>104</a>    )<span class="question-mark">?</span>;
+<a href=#105 id=105 data-nosnippet>105</a>
+<a href=#106 id=106 data-nosnippet>106</a>    <span class="comment">// b must be odd but may be negative
+<a href=#107 id=107 data-nosnippet>107</a>    </span><span class="kw">if </span>b.is_even() {
+<a href=#108 id=108 data-nosnippet>108</a>        b -= <span class="kw-2">&amp;</span>a;
+<a href=#109 id=109 data-nosnippet>109</a>    }
+<a href=#110 id=110 data-nosnippet>110</a>
+<a href=#111 id=111 data-nosnippet>111</a>    QuadraticForm::from_a_b_and_discriminant(a, b, discriminant)
+<a href=#112 id=112 data-nosnippet>112</a>}
+<a href=#113 id=113 data-nosnippet>113</a>
+<a href=#114 id=114 data-nosnippet>114</a><span class="doccomment">/// Sample a product of `prime_factors` primes each of size `prime_factor_size_in_bytes` and return
+<a href=#115 id=115 data-nosnippet>115</a>/// this along with the square root of the discriminant modulo `a`. If the discriminant is not a
+<a href=#116 id=116 data-nosnippet>116</a>/// prime, an [InvalidInput] error may be returned.
+<a href=#117 id=117 data-nosnippet>117</a></span><span class="kw">fn </span>sample_modulus(
+<a href=#118 id=118 data-nosnippet>118</a>    seed: <span class="kw-2">&amp;</span>[u8],
+<a href=#119 id=119 data-nosnippet>119</a>    discriminant: <span class="kw-2">&amp;</span>Discriminant,
+<a href=#120 id=120 data-nosnippet>120</a>    prime_factor_size_in_bytes: u64,
+<a href=#121 id=121 data-nosnippet>121</a>    prime_factors: u64,
+<a href=#122 id=122 data-nosnippet>122</a>) -&gt; FastCryptoResult&lt;(BigInt, BigInt)&gt; {
+<a href=#123 id=123 data-nosnippet>123</a>    <span class="comment">// Seed a rng with the hash of the seed
+<a href=#124 id=124 data-nosnippet>124</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>rng = ChaCha8Rng::from_seed(Sha256::digest(seed).digest);
+<a href=#125 id=125 data-nosnippet>125</a>    <span class="kw">let </span><span class="kw-2">mut </span>factors = Vec::with_capacity(prime_factors <span class="kw">as </span>usize);
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">let </span><span class="kw-2">mut </span>square_roots = Vec::with_capacity(prime_factors <span class="kw">as </span>usize);
+<a href=#127 id=127 data-nosnippet>127</a>
+<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">for _ in </span><span class="number">0</span>..prime_factors {
+<a href=#129 id=129 data-nosnippet>129</a>        <span class="kw">let </span><span class="kw-2">mut </span>factor;
+<a href=#130 id=130 data-nosnippet>130</a>        <span class="kw">loop </span>{
+<a href=#131 id=131 data-nosnippet>131</a>            factor = sample_odd_number(prime_factor_size_in_bytes, <span class="kw-2">&amp;mut </span>rng);
+<a href=#132 id=132 data-nosnippet>132</a>
+<a href=#133 id=133 data-nosnippet>133</a>            <span class="kw">if </span>factors.contains(<span class="kw-2">&amp;</span>factor) {
+<a href=#134 id=134 data-nosnippet>134</a>                <span class="kw">continue</span>;
+<a href=#135 id=135 data-nosnippet>135</a>            }
+<a href=#136 id=136 data-nosnippet>136</a>
+<a href=#137 id=137 data-nosnippet>137</a>            <span class="comment">// The primality check does not try divisions with small primes, so we do it here. This speeds up
+<a href=#138 id=138 data-nosnippet>138</a>            // the algorithm significantly.
+<a href=#139 id=139 data-nosnippet>139</a>            </span><span class="kw">if </span>PRIMES.iter().any(|p| factor.is_multiple_of(p)) {
+<a href=#140 id=140 data-nosnippet>140</a>                <span class="kw">continue</span>;
+<a href=#141 id=141 data-nosnippet>141</a>            }
+<a href=#142 id=142 data-nosnippet>142</a>
+<a href=#143 id=143 data-nosnippet>143</a>            <span class="kw">if </span>jacobi::jacobi(discriminant.as_bigint(), <span class="kw-2">&amp;</span>factor)
+<a href=#144 id=144 data-nosnippet>144</a>                .expect(<span class="string">"factor is odd and positive"</span>)
+<a href=#145 id=145 data-nosnippet>145</a>                == <span class="number">1
+<a href=#146 id=146 data-nosnippet>146</a>                </span>&amp;&amp; is_probable_prime(factor.magnitude())
+<a href=#147 id=147 data-nosnippet>147</a>            {
+<a href=#148 id=148 data-nosnippet>148</a>                <span class="comment">// Found a valid factor
+<a href=#149 id=149 data-nosnippet>149</a>                </span><span class="kw">break</span>;
+<a href=#150 id=150 data-nosnippet>150</a>            }
+<a href=#151 id=151 data-nosnippet>151</a>        }
+<a href=#152 id=152 data-nosnippet>152</a>        <span class="comment">// This only fails if the discriminant is not prime.
+<a href=#153 id=153 data-nosnippet>153</a>        </span><span class="kw">let </span>square_root = modular_square_root(discriminant.as_bigint(), <span class="kw-2">&amp;</span>factor, <span class="bool-val">false</span>)
+<a href=#154 id=154 data-nosnippet>154</a>            .map_err(|<span class="kw">_</span>| InvalidInput)<span class="question-mark">?</span>;
+<a href=#155 id=155 data-nosnippet>155</a>        factors.push(factor);
+<a href=#156 id=156 data-nosnippet>156</a>        square_roots.push(square_root);
+<a href=#157 id=157 data-nosnippet>157</a>    }
+<a href=#158 id=158 data-nosnippet>158</a>
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="kw">let </span>result = factors.iter().product();
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="kw">let </span>square_root = solve_congruence_equation_system(<span class="kw-2">&amp;</span>square_roots, <span class="kw-2">&amp;</span>factors)
+<a href=#161 id=161 data-nosnippet>161</a>        .expect(<span class="string">"The factors are distinct primes"</span>);
+<a href=#162 id=162 data-nosnippet>162</a>
+<a href=#163 id=163 data-nosnippet>163</a>    <span class="prelude-val">Ok</span>((result, square_root))
+<a href=#164 id=164 data-nosnippet>164</a>}
+<a href=#165 id=165 data-nosnippet>165</a>
+<a href=#166 id=166 data-nosnippet>166</a><span class="doccomment">/// Returns an approximation of the log2 of the number of primes smaller than 2^n.
+<a href=#167 id=167 data-nosnippet>167</a></span><span class="kw">fn </span>n_bit_primes(n: u64) -&gt; f64 {
+<a href=#168 id=168 data-nosnippet>168</a>    <span class="comment">// The Prime Number Theorem states that the number of primes smaller than n is close to n / ln(n),
+<a href=#169 id=169 data-nosnippet>169</a>    // so the number of primes smaller than 2^n is approximately:
+<a href=#170 id=170 data-nosnippet>170</a>    //
+<a href=#171 id=171 data-nosnippet>171</a>    // log2(2^n / ln 2^n) = n - log2(ln 2^n)
+<a href=#172 id=172 data-nosnippet>172</a>    //                    = n - log2(n ln 2)
+<a href=#173 id=173 data-nosnippet>173</a>    //                    = n - log2(n) - log2(ln 2)
+<a href=#174 id=174 data-nosnippet>174</a>    </span>n <span class="kw">as </span>f64 - (n <span class="kw">as </span>f64).log2() - <span class="number">2f64</span>.ln().log2()
+<a href=#175 id=175 data-nosnippet>175</a>}
+<a href=#176 id=176 data-nosnippet>176</a>
+<a href=#177 id=177 data-nosnippet>177</a><span class="doccomment">/// Sample a random odd number smaller than 2^{8*size_in_bytes}.
+<a href=#178 id=178 data-nosnippet>178</a></span><span class="kw">fn </span>sample_odd_number&lt;R: Rng&gt;(size_in_bytes: u64, rng: <span class="kw-2">&amp;mut </span>R) -&gt; BigInt {
+<a href=#179 id=179 data-nosnippet>179</a>    <span class="kw">let </span><span class="kw-2">mut </span>bytes = <span class="macro">vec!</span>[<span class="number">0u8</span>; size_in_bytes <span class="kw">as </span>usize];
+<a href=#180 id=180 data-nosnippet>180</a>    rng.fill_bytes(<span class="kw-2">&amp;mut </span>bytes);
+<a href=#181 id=181 data-nosnippet>181</a>    bytes[<span class="number">0</span>] |= <span class="number">1</span>;
+<a href=#182 id=182 data-nosnippet>182</a>    BigInt::from_bytes_le(Sign::Plus, <span class="kw-2">&amp;</span>bytes)
+<a href=#183 id=183 data-nosnippet>183</a>}
+<a href=#184 id=184 data-nosnippet>184</a>
+<a href=#185 id=185 data-nosnippet>185</a><span class="macro">lazy_static!</span> {
+<a href=#186 id=186 data-nosnippet>186</a>    <span class="doccomment">/// The odd primes smaller than 100.
+<a href=#187 id=187 data-nosnippet>187</a>    </span><span class="kw">pub static </span><span class="kw-2">ref </span>PRIMES: Vec&lt;BigInt&gt; = [
+<a href=#188 id=188 data-nosnippet>188</a>        <span class="number">3</span>, <span class="number">5</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">13</span>, <span class="number">17</span>, <span class="number">19</span>, <span class="number">23</span>, <span class="number">29</span>, <span class="number">31</span>, <span class="number">37</span>, <span class="number">41</span>, <span class="number">43</span>, <span class="number">47</span>, <span class="number">53</span>, <span class="number">59</span>, <span class="number">61</span>, <span class="number">67</span>, <span class="number">71</span>, <span class="number">73</span>, <span class="number">79</span>, <span class="number">83</span>, <span class="number">89</span>,
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="number">97</span>,
+<a href=#190 id=190 data-nosnippet>190</a>    ]
+<a href=#191 id=191 data-nosnippet>191</a>    .into_iter()
+<a href=#192 id=192 data-nosnippet>192</a>    .map(BigInt::from)
+<a href=#193 id=193 data-nosnippet>193</a>    .collect();
+<a href=#194 id=194 data-nosnippet>194</a>}
+<a href=#195 id=195 data-nosnippet>195</a>
+<a href=#196 id=196 data-nosnippet>196</a><span class="attr">#[cfg(test)]
+<a href=#197 id=197 data-nosnippet>197</a></span><span class="kw">mod </span>tests {
+<a href=#198 id=198 data-nosnippet>198</a>    <span class="kw">use </span>num_bigint::BigInt;
+<a href=#199 id=199 data-nosnippet>199</a>    <span class="kw">use </span>num_traits::Num;
+<a href=#200 id=200 data-nosnippet>200</a>    <span class="kw">use </span>rand::thread_rng;
+<a href=#201 id=201 data-nosnippet>201</a>    <span class="kw">use </span>rand::RngCore;
+<a href=#202 id=202 data-nosnippet>202</a>
+<a href=#203 id=203 data-nosnippet>203</a>    <span class="kw">use </span><span class="kw">crate</span>::class_group::discriminant::Discriminant;
+<a href=#204 id=204 data-nosnippet>204</a>    <span class="kw">use </span><span class="kw">crate</span>::class_group::hash::hash_to_group_with_custom_parameters;
+<a href=#205 id=205 data-nosnippet>205</a>    <span class="kw">use </span><span class="kw">crate</span>::class_group::QuadraticForm;
+<a href=#206 id=206 data-nosnippet>206</a>    <span class="kw">use </span><span class="kw">crate</span>::math::parameterized_group::ParameterizedGroupElement;
+<a href=#207 id=207 data-nosnippet>207</a>
+<a href=#208 id=208 data-nosnippet>208</a>    <span class="attr">#[test]
+<a href=#209 id=209 data-nosnippet>209</a>    </span><span class="kw">fn </span>test_qf_from_seed() {
+<a href=#210 id=210 data-nosnippet>210</a>        <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0u8</span>; <span class="number">32</span>];
+<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw">let </span>discriminant = Discriminant::from_seed(<span class="kw-2">&amp;</span>seed, <span class="number">1024</span>).unwrap();
+<a href=#212 id=212 data-nosnippet>212</a>
+<a href=#213 id=213 data-nosnippet>213</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">10 </span>{
+<a href=#214 id=214 data-nosnippet>214</a>            <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="kw-2">&amp;</span>seed, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">2</span>).unwrap();
+<a href=#215 id=215 data-nosnippet>215</a>            <span class="macro">assert!</span>(qf.is_reduced_assuming_normal());
+<a href=#216 id=216 data-nosnippet>216</a>            <span class="macro">assert!</span>(qf.is_in_group(<span class="kw-2">&amp;</span>discriminant));
+<a href=#217 id=217 data-nosnippet>217</a>            seed[<span class="number">0</span>] += <span class="number">1</span>;
+<a href=#218 id=218 data-nosnippet>218</a>        }
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">10 </span>{
+<a href=#221 id=221 data-nosnippet>221</a>            <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="kw-2">&amp;</span>seed, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">4</span>).unwrap();
+<a href=#222 id=222 data-nosnippet>222</a>            <span class="macro">assert!</span>(qf.is_reduced_assuming_normal());
+<a href=#223 id=223 data-nosnippet>223</a>            <span class="macro">assert!</span>(qf.is_in_group(<span class="kw-2">&amp;</span>discriminant));
+<a href=#224 id=224 data-nosnippet>224</a>            seed[<span class="number">0</span>] += <span class="number">1</span>;
+<a href=#225 id=225 data-nosnippet>225</a>        }
+<a href=#226 id=226 data-nosnippet>226</a>    }
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a>    <span class="attr">#[test]
+<a href=#229 id=229 data-nosnippet>229</a>    </span><span class="kw">fn </span>qf_from_seed_sanity_tests() {
+<a href=#230 id=230 data-nosnippet>230</a>        <span class="kw">let </span>discriminant = Discriminant::from_seed(<span class="string">b"discriminant seed"</span>, <span class="number">800</span>).unwrap();
+<a href=#231 id=231 data-nosnippet>231</a>        <span class="kw">let </span>base_qf =
+<a href=#232 id=232 data-nosnippet>232</a>            hash_to_group_with_custom_parameters(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">3</span>).unwrap();
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="macro">assert!</span>(base_qf.is_in_group(<span class="kw-2">&amp;</span>discriminant));
+<a href=#234 id=234 data-nosnippet>234</a>
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="comment">// Same seed, same discriminant, same k
+<a href=#236 id=236 data-nosnippet>236</a>        </span><span class="kw">let </span>other_qf =
+<a href=#237 id=237 data-nosnippet>237</a>            hash_to_group_with_custom_parameters(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">3</span>).unwrap();
+<a href=#238 id=238 data-nosnippet>238</a>        <span class="macro">assert_eq!</span>(base_qf, other_qf);
+<a href=#239 id=239 data-nosnippet>239</a>
+<a href=#240 id=240 data-nosnippet>240</a>        <span class="comment">// Smaller k
+<a href=#241 id=241 data-nosnippet>241</a>        </span><span class="kw">let </span>other_qf =
+<a href=#242 id=242 data-nosnippet>242</a>            hash_to_group_with_custom_parameters(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">2</span>).unwrap();
+<a href=#243 id=243 data-nosnippet>243</a>        <span class="macro">assert_ne!</span>(base_qf, other_qf);
+<a href=#244 id=244 data-nosnippet>244</a>
+<a href=#245 id=245 data-nosnippet>245</a>        <span class="comment">// Larger k
+<a href=#246 id=246 data-nosnippet>246</a>        </span><span class="kw">let </span>other_qf =
+<a href=#247 id=247 data-nosnippet>247</a>            hash_to_group_with_custom_parameters(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">4</span>).unwrap();
+<a href=#248 id=248 data-nosnippet>248</a>        <span class="macro">assert_ne!</span>(base_qf, other_qf);
+<a href=#249 id=249 data-nosnippet>249</a>
+<a href=#250 id=250 data-nosnippet>250</a>        <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0u8</span>; <span class="number">32</span>];
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">10 </span>{
+<a href=#252 id=252 data-nosnippet>252</a>            <span class="comment">// Different seed
+<a href=#253 id=253 data-nosnippet>253</a>            </span>thread_rng().fill_bytes(<span class="kw-2">&amp;mut </span>seed);
+<a href=#254 id=254 data-nosnippet>254</a>            <span class="kw">let </span>other_qf =
+<a href=#255 id=255 data-nosnippet>255</a>                hash_to_group_with_custom_parameters(<span class="kw-2">&amp;</span>seed, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">3</span>).unwrap();
+<a href=#256 id=256 data-nosnippet>256</a>            <span class="macro">assert_ne!</span>(base_qf, other_qf);
+<a href=#257 id=257 data-nosnippet>257</a>        }
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a>        <span class="kw">let </span>other_discriminant = Discriminant::from_seed(<span class="string">b"other discriminant seed"</span>, <span class="number">800</span>).unwrap();
+<a href=#260 id=260 data-nosnippet>260</a>
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="comment">// Same seed, same k, other discriminant
+<a href=#262 id=262 data-nosnippet>262</a>        </span><span class="kw">let </span>other_qf =
+<a href=#263 id=263 data-nosnippet>263</a>            hash_to_group_with_custom_parameters(<span class="string">b"qf seed"</span>, <span class="kw-2">&amp;</span>other_discriminant, <span class="number">17</span>, <span class="number">2</span>).unwrap();
+<a href=#264 id=264 data-nosnippet>264</a>        <span class="macro">assert_ne!</span>(base_qf, other_qf);
+<a href=#265 id=265 data-nosnippet>265</a>    }
+<a href=#266 id=266 data-nosnippet>266</a>
+<a href=#267 id=267 data-nosnippet>267</a>    <span class="attr">#[test]
+<a href=#268 id=268 data-nosnippet>268</a>    </span><span class="kw">fn </span>qf_from_seed_regression_tests() {
+<a href=#269 id=269 data-nosnippet>269</a>        <span class="kw">let </span>discriminant = Discriminant::from_trusted_bigint(-BigInt::from_str_radix(<span class="string">"c3811f4ad2f4a7bdf2ed89385866ad526c6dd3aa942e04c141d0562a8e7b014f08804f47b3c2ecbba0a5a0ad8f4d8e869a10cff13dbc522aea141f6d1c42913f2d3bff8d3e7656c72523a2e9d47f838234bd65f05ef3ca86c2f640bca6630ed8d1da21e30a67f83e25b89c32c2d0dc0bacb81bd971b0932a82d131b4a74bff36b60b66543105da2c3ecb1a4e8c2cb6d47c1e85942cce8f3fc50c27856e6dfbd15c0bd5017fea15ae0eb43dfb32b2d947c3131d1951f00bcc40352eeb65e364551e40d13768f443406760ee6b37a5b5819d3f630c034c7f42212ad49c803772aaafd4cd1f87697c68d5a6b0855f475b370b20058558993e76759caa38edbc82407b4e3559bade5f7479a860ebef62fed82d657765ebb8f7f375c2b78f73669760e4bd4932177087a49a0b68d7"</span>, <span class="number">16</span>).unwrap());
+<a href=#270 id=270 data-nosnippet>270</a>
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">34</span>, <span class="number">1</span>).unwrap();
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"2272124e6ab4f8d7ba031217017485e79421d4e56fff43d5aa632a78bf4ffe68a6984922402d5f3fe5d21fd017b87a9409bda5f16fb6349a59bc0ba959f826c2f8f951ae89bf8a026db023918de8bc9b3a76b6572536c19e22ea0f870272dde155bca2f31da8d353ff782736a57a2218393e89e0be6cf6a97e144ef4e6c766a5f8afe506cea47083f70a49ad38dd95cab912f54729ab5ba1bee583ac4b642884df802d41492d13e4c898a63fe120c84ebae686cb1760895f0ffadf3cd46cbf54e4d3998cd0a68b40eb0ffa03df792f8f23b47499c143e6a72c5af9f2f6e626b362c85f7f045d351124dcd7cbdf210fd206c6ad05a502680b093579bbd29c5ef81bc92f90ac34c28292375dd6ed79d272530e22e201ce893304c551b85651a97185e5b8e0433e3bb4583c2bd74eecee64021d59b846b9a55e8dea1888a5d8560e5cc54b58a52e35bac5525e76f8257c2bcaa6"</span>).unwrap());
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a>        <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">2</span>).unwrap();
+<a href=#275 id=275 data-nosnippet>275</a>        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"2300a0f9131173334d92c14bbc1d83d411168de882cb1e387b48a5194006c58632e9a9c33269cc033517c7d6b299377c647ba53aded9e27341dd4b941716b9e5191144864791c162fd9e52c5572ff85beae15ebdd9a2ab8a024dbaa59598e97587ae8ecb848611552c21b4a7a32ee1a69dc968dbc37b67774712a9ca92d630113853952ec9d55c737738c59bfcd452ab7f45d1c8df8ce405f55de4392d85d96428a8f1b547b44a11a2b418f5b4ccbd5385723fd34e60a7e3a4b8ac812addf27ace931c3450f989eae8c382e1f9181914e96a35902e6ef5fe972b7d0a1562d7274a68256de34a228c5260df099baa42a13cc011713dd246f149cb085b5002701e95c1a9c7b61467aefab791d9793bfed8c3ebfb251fe0d8f578b165d79b2cb8109cd6b62f84405f659668b9580fffd6f7631f66079ec18846a9e9feb75c128e318914ff93fcb24152ba7c655131af3a75832b37a5024c8095a13faadd23723b90c586ec"</span>).unwrap());
+<a href=#276 id=276 data-nosnippet>276</a>
+<a href=#277 id=277 data-nosnippet>277</a>        <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">68</span>, <span class="number">1</span>).unwrap();
+<a href=#278 id=278 data-nosnippet>278</a>        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"445bb192c1106b9b7dd9789cb0882c652db9b2d32ee59feb059ffaa8ff392d38b5878e79503bbea893624e847ebe0da2c38606620fc157d00cbb911a634d6c510665b8edff4408b2d1f92ee84acd0d43fead1d7fe8cb353e47b280480e432a8d0327d3059d6f213c30cc87e79f22e1325136c9fbeb76347e9ad989925045f373675c9bb580b2daf03529e9010088751b17498f404f0fa45456e75f49240bdca7b5d587376406ac2c674c4be7a89ef96616e79a1275f980cb6f1622b44657dc26799cfa0eb50e755a04296701a5904251de540ec26246d6571f17b9bc6ecdecc40f66e99fd0a5cf088f73fae967cc985640d5d627a23997d2928c74e888a9aeae55a6e89932e534ffe1d0ba56817c7e0c20ae3379df01b055d8f03085cabbf5608309924bc754d23bd3141766d47c07cdcd93842fe4fb03ea15e23dfbeebc15393c41556d36bd1d3093701e8c7b91e10b7c70d39970091dd6bfefe034faacdb3a8158ce33711d5483d8b91793438d46b9dcd7eaf9a6"</span>).unwrap());
+<a href=#279 id=279 data-nosnippet>279</a>
+<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">34</span>, <span class="number">2</span>).unwrap();
+<a href=#281 id=281 data-nosnippet>281</a>        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"44377b7cf8cb36c4bc0742ffeaf3816b6798bf915b9c8c584a77d65e30973863e43a5af5a252a7ff7615d2d889c026daf82a92833b5becd99ad2d250e5eb91b4ae1f98803d66fec045495392669db030e29e8c58c4bdbd98c27360e9f003ecfee16dfdacbc1c81805bb5a82aba9203483016dd141fd0c18abf1f88cc9116480d9444da2feecbfb0685051b844cfda19fa0d6967a2571ac626a2c1185ca83bc9c854a610595f665753f246cffe90100e184a2ed6c29954f1f43a0f97e961e8ff8d6965d32ad8f76171ba3e756de8795f97606445fa7d7ccaa542056e6216cc54c28396909e0fa6416e8ff2b104ca28e8d372e07834605ca99a394e6a6c19b310786157e7a0e9142edf919022303d6a1399d6bb1c181746be656b66bfded01ed4113cfd9df14ad97117c9700919d9e2aaa2fee589c414307bfefba619daaf654dfa418fb1c088b88574cc6abb344b0715f488782fbd64c6cccf7956b9e7ce9898325ee46fdd2f565609317dce1a74983343355d23f31dd28801e6322c01edcf41508fcf9c001f9702b6ef237d69f183af99436a9f86a07ee"</span>).unwrap());
+<a href=#282 id=282 data-nosnippet>282</a>
+<a href=#283 id=283 data-nosnippet>283</a>        <span class="kw">let </span>qf = hash_to_group_with_custom_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant, <span class="number">17</span>, <span class="number">4</span>).unwrap();
+<a href=#284 id=284 data-nosnippet>284</a>        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"44658cdcc513982dd4e5446a7d41aebce6f8cbd523475b4d1a8547b8b43434fa9eca9b9032844356752b4f4032bfb6b102ee7e0c20b98041414870180baa248f3f596df2df6601c8abfbef53cc4c19cecb3476845f3ebecbb375b652fadf21092ab5324bb1d788285bf6387cc0465333cc303757ef041eb116af12e5df3def1a72d562f58416c566df63456539e57febed5929d96631b8c8ddda294009c5bea70870ed0546d0ea1a67c0e9ffe8017b36740e2ae3f722074cec6cb13f33c47c144dff7ee118dbb07bd3415c91c1295a123724f24fe2bdb5c0565dd90395901d6776407b25f5fe773c54b9e0cb30500718f790d62de3b04de64cbde739d9c2572d0d155971b49e9de123b5d6a3d9f9bcfaefe1954d62302780f800c0a28ae84f2ea717194d649dae838d49454735ef3198c467dc65a81cb39d7c85ae31587df9abb985519d87065267ba1dd93384f8ec27251c8f06bd973ae284bdbb4251fc47ff928a67ac1eb40dc9182c83d0deeb9f9f455311b3b95e6c40bc60be82aa82885db585200e0fc8f0142b426db1cf45fb95f3919279a78a"</span>).unwrap());
+<a href=#285 id=285 data-nosnippet>285</a>    }
+<a href=#286 id=286 data-nosnippet>286</a>
+<a href=#287 id=287 data-nosnippet>287</a>    <span class="attr">#[test]
+<a href=#288 id=288 data-nosnippet>288</a>    </span><span class="kw">fn </span>qf_default_hash_test() {
+<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">let </span>discriminant = Discriminant::from_trusted_bigint(-BigInt::from_str_radix(<span class="string">"c3811f4ad2f4a7bdf2ed89385866ad526c6dd3aa942e04c141d0562a8e7b014f08804f47b3c2ecbba0a5a0ad8f4d8e869a10cff13dbc522aea141f6d1c42913f2d3bff8d3e7656c72523a2e9d47f838234bd65f05ef3ca86c2f640bca6630ed8d1da21e30a67f83e25b89c32c2d0dc0bacb81bd971b0932a82d131b4a74bff36b60b66543105da2c3ecb1a4e8c2cb6d47c1e85942cce8f3fc50c27856e6dfbd15c0bd5017fea15ae0eb43dfb32b2d947c3131d1951f00bcc40352eeb65e364551e40d13768f443406760ee6b37a5b5819d3f630c034c7f42212ad49c803772aaafd4cd1f87697c68d5a6b0855f475b370b20058558993e76759caa38edbc82407b4e3559bade5f7479a860ebef62fed82d657765ebb8f7f375c2b78f73669760e4bd4932177087a49a0b68d7"</span>, <span class="number">16</span>).unwrap());
+<a href=#290 id=290 data-nosnippet>290</a>
+<a href=#291 id=291 data-nosnippet>291</a>        <span class="kw">let </span>qf =
+<a href=#292 id=292 data-nosnippet>292</a>            QuadraticForm::hash_to_group_with_default_parameters(<span class="string">b"seed"</span>, <span class="kw-2">&amp;</span>discriminant).unwrap();
+<a href=#293 id=293 data-nosnippet>293</a>        <span class="macro">assert_eq!</span>(bcs::to_bytes(<span class="kw-2">&amp;</span>qf).unwrap(), hex::decode(<span class="string">"2300a0f9131173334d92c14bbc1d83d411168de882cb1e387b48a5194006c58632e9a9c33269cc033517c7d6b299377c647ba53aded9e27341dd4b941716b9e5191144864791c162fd9e52c5572ff85beae15ebdd9a2ab8a024dbaa59598e97587ae8ecb848611552c21b4a7a32ee1a69dc968dbc37b67774712a9ca92d630113853952ec9d55c737738c59bfcd452ab7f45d1c8df8ce405f55de4392d85d96428a8f1b547b44a11a2b418f5b4ccbd5385723fd34e60a7e3a4b8ac812addf27ace931c3450f989eae8c382e1f9181914e96a35902e6ef5fe972b7d0a1562d7274a68256de34a228c5260df099baa42a13cc011713dd246f149cb085b5002701e95c1a9c7b61467aefab791d9793bfed8c3ebfb251fe0d8f578b165d79b2cb8109cd6b62f84405f659668b9580fffd6f7631f66079ec18846a9e9feb75c128e318914ff93fcb24152ba7c655131af3a75832b37a5024c8095a13faadd23723b90c586ec"</span>).unwrap());
+<a href=#294 id=294 data-nosnippet>294</a>    }
+<a href=#295 id=295 data-nosnippet>295</a>}
 </code></pre></div></section></main></body></html>
