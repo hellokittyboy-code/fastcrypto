@@ -24,6 +24,10 @@ struct Claims {
     pub exp: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jti: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email_verified: Option<bool>,
 }
 
 impl Claims {

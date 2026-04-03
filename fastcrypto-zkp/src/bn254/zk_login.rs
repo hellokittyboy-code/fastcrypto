@@ -27,6 +27,10 @@ use std::cmp::Ordering::{Equal, Greater, Less};
 use std::error::Error;
 use std::fmt::Display;
 use std::str::FromStr;
+use std::sync::RwLock;
+use lazy_static::lazy_static;
+use lru::LruCache;
+use minreq::Method;
 
 #[cfg(test)]
 #[path = "unit_tests/zk_login_tests.rs"]
@@ -43,6 +47,13 @@ const ISS: &str = "iss";
 const BASE64_URL_CHARSET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_EXT_ISS_LEN: u8 = 165;
 const MAX_ISS_LEN_B64: u8 = 4 * (1 + MAX_EXT_ISS_LEN / 3);
+
+lazy_static! {
+    static ref JWK_LRU_CACHE_RW_LOCK: RwLock<LruCache<String, JWK>> = RwLock::new({
+        let cache = LruCache::new(1000);
+        cache
+    });
+}
 
 /// Key to identify a JWK, consists of iss and kid.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord)]
@@ -126,6 +137,8 @@ pub enum OIDCProvider {
     EveFrontier,
     /// https://test.auth.evefrontier.com/.well-known/jwks.json
     TestEveFrontier,
+    /// https://accounts.zkoauth.com/api/oauth2/jwks   https://benpay_oauth.openblock.vip/api/oauth2/jwks
+    BenPay,
 }
 
 impl FromStr for OIDCProvider {
@@ -150,6 +163,7 @@ impl FromStr for OIDCProvider {
             "Arden" => Ok(Self::Arden),
             "EveFrontier" => Ok(Self::EveFrontier),
             "TestEveFrontier" => Ok(Self::TestEveFrontier),
+            "BenPay" => Ok(Self::BenPay),
             _ => {
                 let re = Regex::new(
                     r"AwsTenant-region:(?P<region>[^.]+)-tenant_id:(?P<tenant_id>[^/]+)",
@@ -189,7 +203,8 @@ impl Display for OIDCProvider {
             Self::TestEveFrontier => write!(f, "TestEveFrontier"),
             Self::AwsTenant((region, tenant_id)) => {
                 write!(f, "AwsTenant-region:{}-tenant_id:{}", region, tenant_id)
-            }
+            },
+            Self::BenPay => write!(f, "BenPay"),
         }
     }
 }
@@ -200,7 +215,7 @@ impl OIDCProvider {
         match self {
             OIDCProvider::Google => ProviderConfig::new(
                 "https://accounts.google.com",
-                "https://www.googleapis.com/oauth2/v2/certs",
+                "https://www.googleapis.com/oauth2/v3/certs",
             ),
             OIDCProvider::Twitch => ProviderConfig::new(
                 "https://id.twitch.tv/oauth2",
@@ -271,7 +286,11 @@ impl OIDCProvider {
             OIDCProvider::TestEveFrontier => ProviderConfig::new(
                 "test.auth.evefrontier.com",
                 "https://test.auth.evefrontier.com/.well-known/jwks.json"
-            )
+            ),
+            OIDCProvider::BenPay => ProviderConfig::new(
+                "https://accounts.zkoauth.com",
+                "https://accounts.zkoauth.com/api/oauth2/jwks"
+            ),
         }
     }
 
@@ -296,6 +315,7 @@ impl OIDCProvider {
             "https://oidc.arden.cc" => Ok(Self::Arden),
             "auth.evefrontier.com" => Ok(Self::EveFrontier),
             "test.auth.evefrontier.com" => Ok(Self::TestEveFrontier),
+            "https://accounts.zkoauth.com" => Ok(Self::BenPay),
             iss if match_micrsoft_iss_substring(iss) => Ok(Self::Microsoft),
             _ => match parse_aws_iss_substring(iss) {
                 Ok((region, tenant_id)) => {
@@ -346,14 +366,19 @@ pub struct JWK {
 /// Reader struct to parse all fields in a JWK from JSON.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JWKReader {
-    e: String,
-    n: String,
+    /// RSA public exponent, https://datatracker.ietf.org/doc/html/rfc7517#section-9.3
+    pub e: String,
+    /// RSA modulus, https://datatracker.ietf.org/doc/html/rfc7517#section-9.3
+    pub n: String,
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
     my_use: Option<String>,
-    kid: String,
-    kty: String,
+    /// https://datatracker.ietf.org/doc/html/rfc7517#section-4.5
+    pub kid: String,
+    /// Key type parameter, https://datatracker.ietf.org/doc/html/rfc7517#section-4.1
+    pub kty: String,
+    /// Algorithm parameter, https://datatracker.ietf.org/doc/html/rfc7517#section-4.4
     #[serde(skip_serializing_if = "Option::is_none")]
-    alg: Option<String>,
+    pub alg: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     x5c: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -413,6 +438,60 @@ pub async fn fetch_jwks(
         ))
     })?;
     parse_jwks(&bytes, provider, skip_on_invalid_jwk)
+}
+
+/// fetch jwk from salt service by iss, kid
+pub fn fetch_jwk_from_salt_service(
+    salt_url: String,
+    iss: &String,
+    kid: &String
+) -> Result<JWK, FastCryptoError> {
+    let key = format!("{}-{}", iss, kid);
+    // Access the cache
+    {
+        let readable_cache = JWK_LRU_CACHE_RW_LOCK.read()
+            .unwrap();
+        let value= readable_cache.peek(&key);
+        if value.is_some() {
+            // Clone the jwk
+            return Ok(value.unwrap().clone());
+        }
+    }
+    let json_body = serde_json::json!({ "kid": kid, "iss": iss });
+
+    let response = minreq::Request::new(Method::Post, salt_url)
+        .with_header("Content-Type", "application/json")
+        .with_header("Origin", "https://www.benfen.org")
+        .with_body(json_body.to_string())
+        .send()
+        .map_err(|e| FastCryptoError::GeneralError(format!(
+            "Failed to get salt JWK {:?} {:?} {:?}",
+            e.to_string(),
+            iss,
+            kid
+        )))?;
+
+    let body_str = response.as_str().map_err(|e| FastCryptoError::GeneralError(format!(
+        "Failed to read response {:?} {:?} {:?}",
+        e.to_string(),
+        iss,
+        kid
+    )))?;
+
+    let parsed: JWKReader = serde_json::from_str(body_str)
+        .map_err(|e| FastCryptoError::GeneralError(format!(
+            "Parse error {:?}",
+            e.to_string()
+        )))?;
+
+    let jwk = JWK::from_reader(parsed)?;
+    {
+        // Save jwk to lru cache
+        let mut writable_cache = JWK_LRU_CACHE_RW_LOCK.write()
+            .unwrap();
+        writable_cache.push(key, jwk.clone());
+    }
+    Ok(jwk)
 }
 
 /// Parse the JWK bytes received from the given provider and return a list of JwkId -> JWK.
@@ -583,6 +662,7 @@ impl ZkLoginInputs {
         let header_f = hash_ascii_str_to_field(&self.header_base64, MAX_HEADER_LEN)?;
         let modulus_f = hash_to_field(&[BigUint::from_bytes_be(modulus)], 2048, PACK_WIDTH)?;
         poseidon_zk_login(&[
+            modulus_f,
             first,
             second,
             addr_seed,
@@ -590,7 +670,6 @@ impl ZkLoginInputs {
             iss_base64_f,
             index_mod_4_f,
             header_f,
-            modulus_f,
         ])
     }
 }
